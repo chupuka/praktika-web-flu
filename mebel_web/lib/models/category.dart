@@ -13,6 +13,22 @@ class Category {
 
   bool get isDeleted => deletedAt != null;
 
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'description': description,
+        'deletedAt': deletedAt?.toIso8601String(),
+      };
+
+  factory Category.fromJson(Map<String, dynamic> json) => Category(
+        id: (json['id'] as num?)?.toInt() ?? 0,
+        name: json['name'] as String? ?? '',
+        description: json['description'] as String? ?? '',
+        deletedAt: json['deletedAt'] == null
+            ? null
+            : DateTime.tryParse(json['deletedAt'] as String),
+      );
+
   Category copyWith({
     String? name,
     String? description,

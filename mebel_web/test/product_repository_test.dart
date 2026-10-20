@@ -1,12 +1,17 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mebel_web/data/json_store.dart';
+import 'package:mebel_web/models/product.dart';
 import 'package:mebel_web/models/product_query.dart';
 import 'package:mebel_web/repositories/repositories.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   late ProductRepository repo;
 
-  setUp(() {
-    repo = InMemoryProductRepository();
+  setUp(() async {
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
+    repo = PersistentProductRepository(JsonStore(prefs));
   });
 
   test('без фильтров возвращает все 22 товара', () async {
@@ -60,10 +65,7 @@ void main() {
     );
     expect(result.items.first.name, contains('Прованс'));
     for (var i = 1; i < result.items.length; i++) {
-      expect(
-        result.items[i - 1].price >= result.items[i].price,
-        isTrue,
-      );
+      expect(result.items[i - 1].price >= result.items[i].price, isTrue);
     }
   });
 
@@ -79,9 +81,10 @@ void main() {
     expect(second.items.length, 10);
     expect(second.page, 2);
     expect(
-      first.items.map((p) => p.id).toSet().intersection(
-            second.items.map((p) => p.id).toSet(),
-          ),
+      first.items
+          .map((p) => p.id)
+          .toSet()
+          .intersection(second.items.map((p) => p.id).toSet()),
       isEmpty,
     );
   });
@@ -96,10 +99,9 @@ void main() {
   test('мягкое удаление прячет, флаг показывает, восстановление возвращает',
       () async {
     await repo.softDelete(1);
-    var hidden =
-        await repo.find(const ProductQuery(search: 'Уют', size: 50));
+    var hidden = await repo.find(const ProductQuery(search: 'Уют', size: 50));
     expect(hidden.total, 0);
-    var shown = await repo.find(
+    final shown = await repo.find(
       const ProductQuery(search: 'Уют', includeDeleted: true, size: 50),
     );
     expect(shown.total, 1);
@@ -120,5 +122,44 @@ void main() {
     await repo.softDelete(1);
     final count = await repo.deleteMany([1, 2, 3]);
     expect(count, 2);
+  });
+
+  test('создание товара присваивает новый идентификатор', () async {
+    final id = await repo.create(const Product(
+      id: 0,
+      name: 'Тестовый стул',
+      sku: 'MB-999',
+      price: 1000,
+      categoryId: 2,
+      manufacturerId: 1,
+      materialIds: [4],
+    ));
+    expect(id, 23);
+    final created = await repo.findById(id);
+    expect(created?.name, 'Тестовый стул');
+  });
+
+  test('поиск дубликата артикула находит существующий товар', () async {
+    final duplicate = await repo.findBySku('MB-001');
+    expect(duplicate?.name, contains('Уют'));
+    final own = await repo.findBySku('MB-001', exceptId: 1);
+    expect(own, isNull);
+  });
+
+  test('данные переживают пересоздание репозитория', () async {
+    await repo.create(const Product(
+      id: 0,
+      name: 'Стол сохраняемый',
+      sku: 'MB-777',
+      price: 5000,
+      categoryId: 2,
+      manufacturerId: 1,
+    ));
+    final prefs = await SharedPreferences.getInstance();
+    final fresh = PersistentProductRepository(JsonStore(prefs));
+    final found = await fresh.find(
+      const ProductQuery(search: 'сохраняемый', size: 50),
+    );
+    expect(found.total, 1);
   });
 }

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../models/category.dart';
 import '../models/category_query.dart';
+import '../repositories/repositories.dart';
 import '../state/category_list_notifier.dart';
 import '../state/load_status.dart';
 import '../widgets/confirm_dialog.dart';
@@ -72,6 +73,14 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.go('/'),
         ),
+        actions: [
+          FilledButton.icon(
+            onPressed: () => context.go('/categories/new'),
+            icon: const Icon(Icons.add),
+            label: const Text('Добавить'),
+          ),
+          const SizedBox(width: 12),
+        ],
       ),
       body: Center(
         child: ConstrainedBox(
@@ -296,10 +305,36 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
         onPressed: () => context.go('/categories/${c.id}'),
       ),
       IconButton(
+        tooltip: 'Изменить',
+        icon: const Icon(Icons.edit_outlined),
+        onPressed: () => context.go('/categories/${c.id}/edit'),
+      ),
+      IconButton(
         tooltip: 'Удалить',
         icon: const Icon(Icons.delete_outline),
-        onPressed: () => notifier.softDelete(c.id),
+        onPressed: () => _tryDelete(c, notifier),
       ),
     ];
+  }
+
+  Future<void> _tryDelete(Category c, CategoryListNotifier notifier) async {
+    try {
+      await notifier.softDelete(c.id);
+    } on DeleteBlocked catch (e) {
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Удаление невозможно'),
+          content: Text(e.message),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Понятно'),
+            ),
+          ],
+        ),
+      );
+    }
   }
 }

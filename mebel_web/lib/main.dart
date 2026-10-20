@@ -1,25 +1,61 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import 'data/json_store.dart';
 import 'repositories/repositories.dart';
 import 'router.dart';
 import 'state/category_list_notifier.dart';
 import 'state/product_list_notifier.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   usePathUrlStrategy();
-  runApp(
-    MultiProvider(
+  final prefs = await SharedPreferences.getInstance();
+  runApp(MebelApp(store: JsonStore(prefs)));
+}
+
+class MebelApp extends StatelessWidget {
+  final JsonStore store;
+
+  const MebelApp({super.key, required this.store});
+
+  @override
+  Widget build(BuildContext context) {
+    return MultiProvider(
       providers: [
+        Provider<JsonStore>.value(value: store),
         Provider<ProductRepository>(
-          create: (_) => InMemoryProductRepository(),
+          create: (_) => PersistentProductRepository(store),
         ),
         Provider<CategoryRepository>(
-          create: (_) => InMemoryCategoryRepository(),
+          create: (context) => PersistentCategoryRepository(
+            store,
+            context.read<ProductRepository>(),
+          ),
+        ),
+        Provider<ManufacturerRepository>(
+          create: (context) => PersistentManufacturerRepository(
+            store,
+            context.read<ProductRepository>(),
+          ),
+        ),
+        Provider<MaterialRepository>(
+          create: (context) => PersistentMaterialRepository(
+            store,
+            context.read<ProductRepository>(),
+          ),
+        ),
+        Provider<CustomerRepository>(
+          create: (_) => PersistentCustomerRepository(store),
         ),
         Provider<ReferenceRepository>(
-          create: (_) => InMemoryReferenceRepository(),
+          create: (context) => InMemoryReferenceRepository(
+            context.read<CategoryRepository>(),
+            context.read<ManufacturerRepository>(),
+            context.read<MaterialRepository>(),
+          ),
         ),
         ChangeNotifierProvider(
           create: (context) =>
@@ -32,13 +68,13 @@ void main() {
           ),
         ),
       ],
-      child: const MebelApp(),
-    ),
-  );
+      child: const MebelAppView(),
+    );
+  }
 }
 
-class MebelApp extends StatelessWidget {
-  const MebelApp({super.key});
+class MebelAppView extends StatelessWidget {
+  const MebelAppView({super.key});
 
   @override
   Widget build(BuildContext context) {

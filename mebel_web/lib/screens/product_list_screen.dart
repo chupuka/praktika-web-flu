@@ -93,6 +93,14 @@ class _ProductListScreenState extends State<ProductListScreen> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.go('/'),
         ),
+        actions: [
+          FilledButton.icon(
+            onPressed: () => context.go('/products/new'),
+            icon: const Icon(Icons.add),
+            label: const Text('Добавить'),
+          ),
+          const SizedBox(width: 12),
+        ],
       ),
       body: Center(
         child: ConstrainedBox(
@@ -258,6 +266,11 @@ class _ProductListScreenState extends State<ProductListScreen> {
         tooltip: 'Открыть',
         icon: const Icon(Icons.open_in_new),
         onPressed: () => context.go('/products/${p.id}'),
+      ),
+      IconButton(
+        tooltip: 'Изменить',
+        icon: const Icon(Icons.edit_outlined),
+        onPressed: () => context.go('/products/${p.id}/edit'),
       ),
       IconButton(
         tooltip: 'Удалить',

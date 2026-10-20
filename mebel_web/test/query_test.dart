@@ -1,28 +1,49 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mebel_web/data/json_store.dart';
+import 'package:mebel_web/models/category.dart';
 import 'package:mebel_web/models/category_query.dart';
 import 'package:mebel_web/models/page_result.dart';
 import 'package:mebel_web/models/product_query.dart';
 import 'package:mebel_web/repositories/repositories.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  late CategoryRepository categories;
+  late ProductRepository products;
+
+  setUp(() async {
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
+    final store = JsonStore(prefs);
+    products = PersistentProductRepository(store);
+    categories = PersistentCategoryRepository(store, products);
+  });
+
   test('категорий 8, поиск по названию', () async {
-    final repo = InMemoryCategoryRepository();
-    final all = await repo.find(const CategoryQuery(size: 50));
+    final all = await categories.find(const CategoryQuery(size: 50));
     expect(all.total, 8);
-    final found = await repo.find(
+    final found = await categories.find(
       const CategoryQuery(search: 'шкаф', size: 50),
     );
     expect(found.total, 1);
   });
 
-  test('удаление и восстановление категории', () async {
-    final repo = InMemoryCategoryRepository();
-    await repo.softDelete(1);
-    var all = await repo.find(const CategoryQuery(size: 50));
-    expect(all.total, 7);
-    await repo.restore(1);
-    all = await repo.find(const CategoryQuery(size: 50));
+  test('удаление и восстановление свободной категории', () async {
+    await categories.create(const Category(id: 0, name: 'Свободная'));
+    final created = await categories.findByName('Свободная');
+    await categories.softDelete(created!.id);
+    var all = await categories.find(const CategoryQuery(size: 50));
     expect(all.total, 8);
+    await categories.restore(created.id);
+    all = await categories.find(const CategoryQuery(size: 50));
+    expect(all.total, 9);
+  });
+
+  test('категорию со связанными товарами удалить нельзя', () async {
+    expect(
+      () => categories.softDelete(1),
+      throwsA(isA<DeleteBlocked>()),
+    );
   });
 
   test('смена фильтра возвращает на первую страницу', () {
