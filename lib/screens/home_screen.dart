@@ -1,44 +1,53 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:provider/provider.dart';
-
-import '../logic/settings.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final settings = context.watch<SettingsStore>();
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Главная'),
-        actions: [
-          IconButton(
-            tooltip: 'Переключить тему',
-            icon: Icon(settings.isDark ? Icons.light_mode : Icons.dark_mode),
-            onPressed: () => context.read<SettingsStore>().toggleTheme(),
-          ),
-        ],
-      ),
+      appBar: AppBar(title: const Text('Мебельный магазин')),
       body: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 400),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              FilledButton.icon(
-                onPressed: () => context.go('/calculator'),
-                icon: const Icon(Icons.calculate),
-                label: const Text('Калькулятор'),
-              ),
-              const SizedBox(height: 16),
-              FilledButton.icon(
-                onPressed: () => context.go('/converter'),
-                icon: const Icon(Icons.currency_exchange),
-                label: const Text('Конвертер валют'),
-              ),
-            ],
+          constraints: const BoxConstraints(maxWidth: 460),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                FilledButton.icon(
+                  onPressed: () => context.go('/products'),
+                  icon: const Icon(Icons.chair),
+                  label: const Text('Каталог товаров'),
+                ),
+                const SizedBox(height: 12),
+                FilledButton.tonalIcon(
+                  onPressed: () => context.go('/categories'),
+                  icon: const Icon(Icons.category),
+                  label: const Text('Категории'),
+                ),
+                const SizedBox(height: 12),
+                FilledButton.tonalIcon(
+                  onPressed: () => context.go('/manufacturers'),
+                  icon: const Icon(Icons.factory),
+                  label: const Text('Производители'),
+                ),
+                const SizedBox(height: 12),
+                FilledButton.tonalIcon(
+                  onPressed: () => context.go('/materials'),
+                  icon: const Icon(Icons.layers),
+                  label: const Text('Материалы'),
+                ),
+                const SizedBox(height: 12),
+                FilledButton.tonalIcon(
+                  onPressed: () => context.go('/customers'),
+                  icon: const Icon(Icons.people),
+                  label: const Text('Покупатели'),
+                ),
+              ],
+            ),
           ),
         ),
       ),
