@@ -129,20 +129,20 @@ function seed() {
   P('Пуф «Мягкий»', 'MB-022', 'Круглый пуф с отделением для хранения.', 'modern', 5990, 0, 45, 45, 40, 5, 'Горчичный', catSofas, ikea, [velvet]);
 
   const customers = [
-    ['Иванова Мария Петровна', 'ivanova.maria@example.com', '+7 900 111-22-33', 'Москва, ул. Тверская, д. 12, кв. 5', { number: 'CL-1001', issuedAt: '2024-03-15', tier: 'gold', points: 1240 }],
-    ['Петров Алексей Ильич', 'petrov.alexey@example.com', '+7 901 222-33-44', 'Санкт-Петербург, Невский пр., д. 88', { number: 'CL-1002', issuedAt: '2024-07-02', tier: 'silver', points: 430 }],
-    ['Соколова Ольга Викторовна', 'sokolova.olga@example.com', '+7 902 333-44-55', 'Казань, ул. Баумана, д. 40', null],
-    ['Кузнецов Дмитрий Сергеевич', 'kuznetsov.dmitry@example.com', '+7 903 444-55-66', 'Новосибирск, ул. Ленина, д. 7', { number: 'CL-1003', issuedAt: '2025-01-20', tier: 'basic', points: 85 }],
-    ['Николаева Екатерина Андреевна', 'nikolaeva.ekaterina@example.com', '+7 904 555-66-77', 'Екатеринбург, ул. Малышева, д. 101', null],
+    ['Иванова Мария Петровна', 'kreslo.ivanovna@gmail.com', '+7 900 111-22-33', 'Москва, ул. Тверская, д. 12, кв. 5', { number: 'CL-1001', issuedAt: '2024-03-15', tier: 'gold', points: 1240 }],
+    ['Петров Алексей Ильич', 'divan.petrovich@gmail.com', '+7 901 222-33-44', 'Санкт-Петербург, Невский пр., д. 88', { number: 'CL-1002', issuedAt: '2024-07-02', tier: 'silver', points: 430 }],
+    ['Соколова Ольга Викторовна', 'polochka.olga@gmail.com', '+7 902 333-44-55', 'Казань, ул. Баумана, д. 40', null],
+    ['Кузнецов Дмитрий Сергеевич', 'shkaf.kuznecov@gmail.com', '+7 903 444-55-66', 'Новосибирск, ул. Ленина, д. 7', { number: 'CL-1003', issuedAt: '2025-01-20', tier: 'basic', points: 85 }],
+    ['Николаева Екатерина Андреевна', 'taburetka.kate@gmail.com', '+7 904 555-66-77', 'Екатеринбург, ул. Малышева, д. 101', null],
   ];
 
   for (const [fullName, email, phone, address, card] of customers) {
     push('customers', { fullName, email, phone, address, card });
   }
 
-  push('users', { username: 'admin', passwordHash: hash('admin123'), fullName: 'Администратор', email: 'admin@mebel.local', role: 'admin', customerId: null });
-  push('users', { username: 'manager', passwordHash: hash('manager123'), fullName: 'Менеджер Бортников А. П.', email: 'manager@mebel.local', role: 'manager', customerId: null });
-  push('users', { username: 'customer', passwordHash: hash('customer123'), fullName: 'Иванова Мария Петровна', email: 'ivanova.maria@example.com', role: 'customer', customerId: 1 });
+  push('users', { username: 'admin', passwordHash: hash('admin123'), fullName: 'Администратор', email: 'admin.za.divan@gmail.com', role: 'admin', customerId: null });
+  push('users', { username: 'manager', passwordHash: hash('manager123'), fullName: 'Менеджер Бортников А. П.', email: 'menedzher.polok@gmail.com', role: 'manager', customerId: null });
+  push('users', { username: 'customer', passwordHash: hash('customer123'), fullName: 'Иванова Мария Петровна', email: 'kreslo.ivanovna@gmail.com', role: 'customer', customerId: 1 });
 }
 
 function slimCategory(id) {
@@ -694,6 +694,78 @@ async function handle(req, res, url) {
     });
   }
 
+  if (path === '/api/auth/register' && method === 'POST') {
+    const body = await readBody(req);
+    if (!body) return fail(res, 400, 'Тело запроса не является корректным JSON');
+
+    const username = String(body.username || '').trim();
+    const fullName = String(body.fullName || '').trim();
+    const email = String(body.email || '').trim();
+    const password = String(body.password || '');
+    const errors = {};
+
+    if (!/^[a-zA-Z0-9._-]{3,32}$/.test(username)) {
+      errors.username = 'Логин: 3–32 символа, латиница, цифры, точка, дефис или подчёркивание';
+    } else if (db.users.some((u) => u.username === username)) {
+      errors.username = 'Такой логин уже занят';
+    }
+    if (fullName.length < 3) errors.fullName = 'Укажите имя и фамилию';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      errors.email = 'Некорректный адрес почты';
+    } else if (db.users.some((u) => u.email.toLowerCase() === email.toLowerCase())) {
+      errors.email = 'Пользователь с такой почтой уже зарегистрирован';
+    }
+    if (password.length < 8) {
+      errors.password = 'Пароль: минимум 8 символов';
+    } else if (!/\d/.test(password)) {
+      errors.password = 'Пароль должен содержать цифру';
+    } else if (!/[^A-Za-z0-9]/.test(password)) {
+      errors.password = 'Пароль должен содержать специальный символ';
+    }
+
+    if (Object.keys(errors).length) {
+      return send(res, 422, { message: 'Ошибка валидации', errors });
+    }
+
+    const customerId = push('customers', {
+      fullName,
+      email,
+      phone: '',
+      address: '',
+      card: null,
+    });
+    const userId = push('users', {
+      username,
+      passwordHash: hash(password),
+      fullName,
+      email,
+      role: 'customer',
+      customerId,
+    });
+    const found = db.users.find((u) => u.id === userId);
+
+    const now = Math.floor(Date.now() / 1000);
+    const accessToken = sign({
+      sub: found.id,
+      role: found.role,
+      type: 'access',
+      exp: now + ACCESS_TTL,
+    });
+    const refreshToken = sign({
+      sub: found.id,
+      type: 'refresh',
+      exp: now + REFRESH_TTL,
+    });
+    db.refreshTokens.add(refreshToken);
+
+    return send(res, 201, {
+      accessToken,
+      refreshToken,
+      expiresIn: ACCESS_TTL,
+      user: expandUser(found),
+    });
+  }
+
   if (path === '/api/auth/refresh' && method === 'POST') {
     const body = await readBody(req);
     const token = body && body.refreshToken;
@@ -746,6 +818,45 @@ async function handle(req, res, url) {
       ...page,
       items: page.items.map(expandUser),
     });
+  }
+
+  const userMatch = path.match(/^\/api\/users\/(\d+)$/);
+  if (userMatch) {
+    if (!requireRole(res, user, 'admin')) return;
+    const userId = Number(userMatch[1]);
+    const row = db.users.find((u) => u.id === userId && !u.deletedAt);
+    if (!row) return fail(res, 404, 'Пользователь не найден');
+
+    if (method === 'PATCH' || method === 'PUT') {
+      const body = await readBody(req);
+      if (!body) return fail(res, 400, 'Тело запроса не является корректным JSON');
+      const role = String(body.role || '');
+      if (!Object.keys(ROLE_LEVEL).includes(role)) {
+        return send(res, 422, {
+          message: 'Ошибка валидации',
+          errors: { role: 'Допустимые роли: customer, manager, admin' },
+        });
+      }
+      if (row.id === user.id && role !== 'admin') {
+        return fail(res, 409, 'Нельзя снять с себя роль администратора');
+      }
+      row.role = role;
+      return send(res, 200, expandUser(row));
+    }
+
+    if (method === 'DELETE') {
+      if (row.id === user.id) {
+        return fail(res, 409, 'Нельзя удалить собственную учётную запись');
+      }
+      const admins = db.users.filter(
+        (u) => u.role === 'admin' && !u.deletedAt
+      ).length;
+      if (row.role === 'admin' && admins <= 1) {
+        return fail(res, 409, 'Нельзя удалить последнего администратора');
+      }
+      row.deletedAt = new Date().toISOString();
+      return send(res, 204);
+    }
   }
 
   const bulk = path.match(/^\/api\/([a-z]+)\/bulk-delete$/);

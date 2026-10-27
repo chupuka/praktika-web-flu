@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../auth/permissions.dart';
 import '../models/page_result.dart';
 import '../repositories/repositories.dart';
+import '../state/auth_notifier.dart';
 import '../state/load_status.dart';
 import '../widgets/confirm_dialog.dart';
 import '../widgets/entity_table.dart';
@@ -172,6 +174,7 @@ class _EntityListScreenState<T> extends State<EntityListScreen<T>> {
 
   @override
   Widget build(BuildContext context) {
+    final isAdmin = context.watch<AuthNotifier>().can(Permission.hardDelete);
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.title),
@@ -196,11 +199,11 @@ class _EntityListScreenState<T> extends State<EntityListScreen<T>> {
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
-                _buildFilterBar(),
+                _buildFilterBar(isAdmin),
                 const SizedBox(height: 8),
                 if (_selected.isNotEmpty) _buildSelectionBar(),
                 const SizedBox(height: 8),
-                Expanded(child: _buildBody()),
+                Expanded(child: _buildBody(isAdmin)),
               ],
             ),
           ),
@@ -209,7 +212,7 @@ class _EntityListScreenState<T> extends State<EntityListScreen<T>> {
     );
   }
 
-  Widget _buildFilterBar() {
+  Widget _buildFilterBar(bool isAdmin) {
     return Wrap(
       spacing: 12,
       runSpacing: 12,
@@ -235,17 +238,18 @@ class _EntityListScreenState<T> extends State<EntityListScreen<T>> {
             ),
           ),
         ),
-        FilterChip(
-          label: const Text('Показать удалённые'),
-          selected: _includeDeleted,
-          onSelected: (value) {
-            setState(() {
-              _includeDeleted = value;
-              _page = 1;
-            });
-            _reload();
-          },
-        ),
+        if (isAdmin)
+          FilterChip(
+            label: const Text('Показать удалённые'),
+            selected: _includeDeleted,
+            onSelected: (value) {
+              setState(() {
+                _includeDeleted = value;
+                _page = 1;
+              });
+              _reload();
+            },
+          ),
         TextButton(
           onPressed: () {
             _searchController.clear();
@@ -289,7 +293,7 @@ class _EntityListScreenState<T> extends State<EntityListScreen<T>> {
     );
   }
 
-  Widget _buildBody() {
+  Widget _buildBody(bool isAdmin) {
     switch (_status) {
       case LoadStatus.idle:
       case LoadStatus.loading:
@@ -340,7 +344,7 @@ class _EntityListScreenState<T> extends State<EntityListScreen<T>> {
                 sortField: _sortField,
                 sortAscending: _ascending,
                 onSort: _setSort,
-                actions: (item) => _rowActions(item),
+                actions: (item) => _rowActions(item, isAdmin),
                 columns: [
                   for (final column in widget.columns)
                     TableColumnSpec<T>(
@@ -375,9 +379,10 @@ class _EntityListScreenState<T> extends State<EntityListScreen<T>> {
     }
   }
 
-  List<Widget> _rowActions(T item) {
+  List<Widget> _rowActions(T item, bool isAdmin) {
     final id = widget.idOf(item);
     if (widget.isDeleted(item)) {
+      if (!isAdmin) return const [];
       return [
         IconButton(
           tooltip: 'Восстановить',

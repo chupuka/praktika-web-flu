@@ -40,7 +40,7 @@ const seedCustomers = [
   Customer(
     id: 1,
     fullName: 'Иванова Мария Петровна',
-    email: 'ivanova.maria@example.com',
+    email: 'kreslo.ivanovna@gmail.com',
     phone: '+7 900 111-22-33',
     address: 'Москва, ул. Тверская, д. 12, кв. 5',
     card: CustomerCard(number: 'CL-1001', issuedAt: '2024-03-15', tier: 'gold', points: 1240),
@@ -48,7 +48,7 @@ const seedCustomers = [
   Customer(
     id: 2,
     fullName: 'Петров Алексей Ильич',
-    email: 'petrov.alexey@example.com',
+    email: 'divan.petrovich@gmail.com',
     phone: '+7 901 222-33-44',
     address: 'Санкт-Петербург, Невский пр., д. 88',
     card: CustomerCard(number: 'CL-1002', issuedAt: '2024-07-02', tier: 'silver', points: 430),
@@ -56,14 +56,14 @@ const seedCustomers = [
   Customer(
     id: 3,
     fullName: 'Соколова Ольга Викторовна',
-    email: 'sokolova.olga@example.com',
+    email: 'polochka.olga@gmail.com',
     phone: '+7 902 333-44-55',
     address: 'Казань, ул. Баумана, д. 40',
   ),
   Customer(
     id: 4,
     fullName: 'Кузнецов Дмитрий Сергеевич',
-    email: 'kuznetsov.dmitry@example.com',
+    email: 'shkaf.kuznecov@gmail.com',
     phone: '+7 903 444-55-66',
     address: 'Новосибирск, ул. Ленина, д. 7',
     card: CustomerCard(number: 'CL-1003', issuedAt: '2025-01-20', tier: 'basic', points: 85),
@@ -71,7 +71,7 @@ const seedCustomers = [
   Customer(
     id: 5,
     fullName: 'Николаева Екатерина Андреевна',
-    email: 'nikolaeva.ekaterina@example.com',
+    email: 'taburetka.kate@gmail.com',
     phone: '+7 904 555-66-77',
     address: 'Екатеринбург, ул. Малышева, д. 101',
   ),

@@ -9,6 +9,8 @@ class ApiClient {
   final Dio _dio;
   String? _accessToken;
 
+  Future<bool> Function()? onUnauthorized;
+
   ApiClient({Dio? dio})
       : _dio = dio ??
             Dio(
@@ -28,6 +30,29 @@ class ApiClient {
           }
           handler.next(options);
         },
+        onResponse: (response, handler) async {
+          final options = response.requestOptions;
+          final isAuthPath = options.path.contains('/auth/');
+          final alreadyRetried = options.extra['retriedAfterRefresh'] == true;
+          final callback = onUnauthorized;
+          if (response.statusCode != 401 ||
+              isAuthPath ||
+              alreadyRetried ||
+              callback == null) {
+            return handler.next(response);
+          }
+          final refreshed = await callback();
+          if (!refreshed) return handler.next(response);
+
+          options.extra['retriedAfterRefresh'] = true;
+          options.headers['Authorization'] = 'Bearer $_accessToken';
+          try {
+            final retried = await _dio.fetch<dynamic>(options);
+            return handler.resolve(retried);
+          } catch (_) {
+            return handler.next(response);
+          }
+        },
       ),
     );
   }
@@ -38,21 +63,6 @@ class ApiClient {
 
   void setAccessToken(String? token) {
     _accessToken = token;
-  }
-
-  Future<Map<String, dynamic>> login(
-    String username,
-    String password,
-  ) async {
-    return guard(() async {
-      final response = await _dio.post<Map<String, dynamic>>(
-        '/auth/login',
-        data: {'username': username, 'password': password},
-      );
-      final data = response.data ?? const <String, dynamic>{};
-      _accessToken = data['accessToken'] as String?;
-      return data;
-    });
   }
 
   Future<T> get<T>(
@@ -83,6 +93,25 @@ class ApiClient {
     return guard(
       () async {
         final response = await _dio.post<T>(
+          path,
+          data: data,
+          queryParameters: queryParameters,
+          cancelToken: cancelToken,
+        );
+        return _unwrap(response);
+      },
+    );
+  }
+
+  Future<T> patch<T>(
+    String path, {
+    Object? data,
+    Map<String, dynamic>? queryParameters,
+    CancelToken? cancelToken,
+  }) {
+    return guard(
+      () async {
+        final response = await _dio.patch<T>(
           path,
           data: data,
           queryParameters: queryParameters,

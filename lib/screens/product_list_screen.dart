@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../auth/permissions.dart';
 import '../data/seed.dart';
 import '../models/product.dart';
 import '../models/product_query.dart';
 import '../repositories/repositories.dart';
+import '../state/auth_notifier.dart';
 import '../state/load_status.dart';
 import '../state/product_list_notifier.dart';
 import '../widgets/confirm_dialog.dart';
@@ -86,6 +88,9 @@ class _ProductListScreenState extends State<ProductListScreen> {
     final notifier = context.watch<ProductListNotifier>();
     final query = notifier.query;
     final refs = context.watch<ReferenceRepository>();
+    final auth = context.watch<AuthNotifier>();
+    final canManage = auth.can(Permission.manageProducts);
+    final isAdmin = auth.can(Permission.hardDelete);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Каталог товаров'),
@@ -95,12 +100,21 @@ class _ProductListScreenState extends State<ProductListScreen> {
           onPressed: () => context.go('/'),
         ),
         actions: [
-          FilledButton.icon(
-            onPressed: () => context.go('/products/new'),
-            icon: const Icon(Icons.add),
-            label: const Text('Добавить'),
-          ),
-          const SizedBox(width: 12),
+          if (canManage) ...[
+            FilledButton.icon(
+              onPressed: () => context.go('/products/new'),
+              icon: const Icon(Icons.add),
+              label: const Text('Добавить'),
+            ),
+            const SizedBox(width: 12),
+          ] else
+            const Padding(
+              padding: EdgeInsets.only(right: 16),
+              child: Chip(
+                avatar: Icon(Icons.visibility_outlined, size: 16),
+                label: Text('Только просмотр'),
+              ),
+            ),
         ],
       ),
       body: Center(
@@ -115,11 +129,12 @@ class _ProductListScreenState extends State<ProductListScreen> {
                   priceFromController: _priceFromController,
                   priceToController: _priceToController,
                   query: query,
+                  showDeleted: canManage,
                   onSearch: (v) => notifier.searchSoon(v),
                   onChanged: _go,
                 ),
                 const SizedBox(height: 8),
-                if (notifier.hasSelection)
+                if (canManage && notifier.hasSelection)
                   Row(
                     children: [
                       Text('Выбрано: ${notifier.selected.length}'),
@@ -143,7 +158,9 @@ class _ProductListScreenState extends State<ProductListScreen> {
                     ],
                   ),
                 const SizedBox(height: 8),
-                Expanded(child: _buildBody(notifier, refs)),
+                Expanded(
+                  child: _buildBody(notifier, refs, canManage, isAdmin),
+                ),
               ],
             ),
           ),
@@ -152,7 +169,12 @@ class _ProductListScreenState extends State<ProductListScreen> {
     );
   }
 
-  Widget _buildBody(ProductListNotifier notifier, ReferenceRepository refs) {
+  Widget _buildBody(
+    ProductListNotifier notifier,
+    ReferenceRepository refs,
+    bool canManage,
+    bool isAdmin,
+  ) {
     switch (notifier.status) {
       case LoadStatus.idle:
       case LoadStatus.loading:
@@ -177,6 +199,8 @@ class _ProductListScreenState extends State<ProductListScreen> {
                 items: result.items,
                 notifier: notifier,
                 refs: refs,
+                canManage: canManage,
+                isAdmin: isAdmin,
                 onPage: (p) => _go(notifier.query.copyWith(page: p)),
                 onSize: (s) => _go(notifier.query.copyWith(size: s)),
               );
@@ -188,18 +212,21 @@ class _ProductListScreenState extends State<ProductListScreen> {
                     items: result.items,
                     idOf: (p) => p.id,
                     selected: notifier.selected,
-                    onToggleSelect: notifier.toggleSelection,
-                    onSelectAll: (v) {
-                      if (v ?? false) {
-                        notifier.selectAll(result.items.map((p) => p.id));
-                      } else {
-                        notifier.clearSelection();
-                      }
-                    },
+                    onToggleSelect: canManage ? notifier.toggleSelection : null,
+                    onSelectAll: !canManage
+                        ? null
+                        : (v) {
+                            if (v ?? false) {
+                              notifier.selectAll(result.items.map((p) => p.id));
+                            } else {
+                              notifier.clearSelection();
+                            }
+                          },
                     sortField: notifier.query.sortField,
                     sortAscending: notifier.query.sortAscending,
                     onSort: (f) => _onSort(f, notifier.query),
-                    actions: (p) => _rowActions(p, notifier),
+                    actions: (p) =>
+                        _rowActions(p, notifier, canManage, isAdmin),
                     columns: [
                       TableColumnSpec(
                         label: 'Название',
@@ -246,8 +273,14 @@ class _ProductListScreenState extends State<ProductListScreen> {
     }
   }
 
-  List<Widget> _rowActions(Product p, ProductListNotifier notifier) {
+  List<Widget> _rowActions(
+    Product p,
+    ProductListNotifier notifier,
+    bool canManage,
+    bool isAdmin,
+  ) {
     if (p.isDeleted) {
+      if (!isAdmin) return const [];
       return [
         IconButton(
           tooltip: 'Восстановить',
@@ -280,19 +313,21 @@ class _ProductListScreenState extends State<ProductListScreen> {
         icon: const Icon(Icons.open_in_new),
         onPressed: () => context.go('/products/${p.id}'),
       ),
-      IconButton(
-        tooltip: 'Изменить',
-        icon: const Icon(Icons.edit_outlined),
-        onPressed: () => context.go('/products/${p.id}/edit'),
-      ),
-      IconButton(
-        tooltip: 'Удалить',
-        icon: const Icon(Icons.delete_outline),
-        onPressed: () => runApiAction(
-          context,
-          () => notifier.softDelete(p.id),
+      if (canManage) ...[
+        IconButton(
+          tooltip: 'Изменить',
+          icon: const Icon(Icons.edit_outlined),
+          onPressed: () => context.go('/products/${p.id}/edit'),
         ),
-      ),
+        IconButton(
+          tooltip: 'Удалить',
+          icon: const Icon(Icons.delete_outline),
+          onPressed: () => runApiAction(
+            context,
+            () => notifier.softDelete(p.id),
+          ),
+        ),
+      ],
     ];
   }
 }
@@ -301,6 +336,8 @@ class _Cards extends StatelessWidget {
   final List<Product> items;
   final ProductListNotifier notifier;
   final ReferenceRepository refs;
+  final bool canManage;
+  final bool isAdmin;
   final ValueChanged<int> onPage;
   final ValueChanged<int> onSize;
 
@@ -308,6 +345,8 @@ class _Cards extends StatelessWidget {
     required this.items,
     required this.notifier,
     required this.refs,
+    required this.canManage,
+    required this.isAdmin,
     required this.onPage,
     required this.onSize,
   });
@@ -324,32 +363,40 @@ class _Cards extends StatelessWidget {
               final selected = notifier.selected.contains(p.id);
               return Card(
                 child: ListTile(
-                  leading: Checkbox(
-                    value: selected,
-                    onChanged: (_) => notifier.toggleSelection(p.id),
-                  ),
+                  leading: canManage
+                      ? Checkbox(
+                          value: selected,
+                          onChanged: (_) => notifier.toggleSelection(p.id),
+                        )
+                      : null,
                   title: Text(p.name + (p.isDeleted ? ' (удалён)' : '')),
                   subtitle: Text(
                     '${refs.categoryName(p.categoryId)} • '
                     '${p.price.toStringAsFixed(0)} ₽ • Остаток: ${p.stock}',
                   ),
-                  trailing: p.isDeleted
-                      ? IconButton(
-                          tooltip: 'Восстановить',
-                          icon: const Icon(Icons.restore),
-                          onPressed: () => runApiAction(
-                            context,
-                            () => notifier.restore(p.id),
-                          ),
-                        )
-                      : IconButton(
-                          tooltip: 'Удалить',
-                          icon: const Icon(Icons.delete_outline),
-                          onPressed: () => runApiAction(
-                            context,
-                            () => notifier.softDelete(p.id),
-                          ),
-                        ),
+                  trailing: !canManage && !isAdmin
+                      ? null
+                      : p.isDeleted
+                          ? (isAdmin
+                              ? IconButton(
+                                  tooltip: 'Восстановить',
+                                  icon: const Icon(Icons.restore),
+                                  onPressed: () => runApiAction(
+                                    context,
+                                    () => notifier.restore(p.id),
+                                  ),
+                                )
+                              : null)
+                          : (canManage
+                              ? IconButton(
+                                  tooltip: 'Удалить',
+                                  icon: const Icon(Icons.delete_outline),
+                                  onPressed: () => runApiAction(
+                                    context,
+                                    () => notifier.softDelete(p.id),
+                                  ),
+                                )
+                              : null),
                   onTap: () => context.go('/products/${p.id}'),
                 ),
               );
@@ -375,6 +422,7 @@ class _FilterPanel extends StatelessWidget {
   final TextEditingController priceFromController;
   final TextEditingController priceToController;
   final ProductQuery query;
+  final bool showDeleted;
   final ValueChanged<String> onSearch;
   final ValueChanged<ProductQuery> onChanged;
 
@@ -383,6 +431,7 @@ class _FilterPanel extends StatelessWidget {
     required this.priceFromController,
     required this.priceToController,
     required this.query,
+    required this.showDeleted,
     required this.onSearch,
     required this.onChanged,
   });
@@ -518,12 +567,13 @@ class _FilterPanel extends StatelessWidget {
                 onSelected: (v) =>
                     onChanged(query.copyWith(inStockOnly: v)),
               ),
-              FilterChip(
-                label: const Text('Показать удалённые'),
-                selected: query.includeDeleted,
-                onSelected: (v) =>
-                    onChanged(query.copyWith(includeDeleted: v)),
-              ),
+              if (showDeleted)
+                FilterChip(
+                  label: const Text('Показать удалённые'),
+                  selected: query.includeDeleted,
+                  onSelected: (v) =>
+                      onChanged(query.copyWith(includeDeleted: v)),
+                ),
               TextButton(
                 onPressed: () => onChanged(const ProductQuery()),
                 child: const Text('Сбросить всё'),
