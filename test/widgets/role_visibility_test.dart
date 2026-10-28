@@ -79,7 +79,7 @@ void main() {
     final auth = await _pumpHome(
       tester,
       const AppUser(
-        id: 3,
+        id: '3',
         username: 'customer',
         fullName: 'Иванова Мария Петровна',
         email: 'kreslo.ivanovna@gmail.com',
@@ -101,7 +101,7 @@ void main() {
     final auth = await _pumpHome(
       tester,
       const AppUser(
-        id: 1,
+        id: '1',
         username: 'admin',
         fullName: 'Администратор',
         email: 'admin.za.divan@gmail.com',

@@ -25,7 +25,7 @@ class _FakeAuthRepository implements AuthRepository {
         refreshToken: 'refresh',
         expiresIn: 900,
         user: AppUser(
-          id: 1,
+          id: '1',
           username: 'admin',
           fullName: 'Администратор',
           email: 'admin@example.com',

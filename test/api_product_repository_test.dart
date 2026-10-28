@@ -13,7 +13,7 @@ void main() {
   late ApiClient client;
   late ApiProductRepository repo;
 
-  Map<String, dynamic> productJson({
+  Map<String, dynamic> productRow({
     int id = 1,
     String name = 'Диван-кровать «Уют»',
     String sku = 'MB-001',
@@ -34,27 +34,25 @@ void main() {
       'height': 85,
       'weight': 45,
       'color': 'Серый',
-      'categoryId': categoryId,
-      'manufacturerId': 2,
-      'materialIds': [6, 4],
-      'category': {'id': categoryId, 'name': 'Диваны и кресла'},
-      'manufacturer': {'id': 2, 'name': 'Hoff'},
-      'materials': [
-        {'id': 6, 'name': 'Микрофибра'},
-        {'id': 4, 'name': 'Металл'},
+      'category_id': categoryId,
+      'manufacturer_id': 2,
+      'created_at': '2026-10-28T13:49:36.711Z',
+      'deleted_at': null,
+      'product_materials': [
+        {'material_id': 6},
+        {'material_id': 4},
       ],
-      'deletedAt': null,
     };
   }
 
-  Map<String, dynamic> page(List<Map<String, dynamic>> items, int total) {
-    return {
-      'items': items,
-      'page': 1,
-      'size': 10,
-      'total': total,
-      'totalPages': 1,
-    };
+  MockResponse listResponse(List<Map<String, dynamic>> rows, int total) {
+    return MockResponse(
+      200,
+      body: rows,
+      headers: {
+        'content-range': ['0-${rows.length - 1}/$total'],
+      },
+    );
   }
 
   setUp(() {
@@ -65,7 +63,7 @@ void main() {
   });
 
   test('список товаров разбирается в PageResult', () async {
-    adapter.enqueueJson(200, page([productJson()], 1));
+    adapter.enqueue(listResponse([productRow()], 1));
 
     final result = await repo.find(const ProductQuery());
 
@@ -74,8 +72,8 @@ void main() {
     expect(result.items.single.materialIds, [6, 4]);
   });
 
-  test('запрос уходит с параметрами фильтра', () async {
-    adapter.enqueueJson(200, page([], 0));
+  test('запрос уходит с параметрами фильтра и сортировки', () async {
+    adapter.enqueue(listResponse([], 0));
 
     await repo.find(
       const ProductQuery(search: 'диван', categoryId: 1, size: 25),
@@ -83,15 +81,17 @@ void main() {
 
     final request = adapter.requests.single;
     expect(request.method, 'GET');
-    expect(request.path, '/products');
-    expect(request.query['search'], 'диван');
-    expect(request.query['categoryId'], '1');
-    expect(request.query['size'], '25');
+    expect(request.path, 'products');
+    expect(request.query['category_id'], 'eq.1');
+    expect(request.query['limit'], '25');
+    expect(request.query['or'], contains('name.ilike.*диван*'));
+    expect(request.query['order'], 'name.asc');
+    expect(request.headers['Prefer'], 'count=exact');
   });
 
   test('токен подставляется в заголовок авторизации', () async {
     client.setAccessToken('токен-123');
-    adapter.enqueueJson(200, page([], 0));
+    adapter.enqueue(listResponse([], 0));
 
     await repo.find(const ProductQuery());
 
@@ -99,10 +99,13 @@ void main() {
         adapter.requests.single.headers['Authorization'], 'Bearer токен-123');
   });
 
-  test('ответ 422 превращается в ValidationException с полями', () async {
-    adapter.enqueueJson(422, {
-      'message': 'Ошибка валидации',
-      'errors': {'sku': 'Товар с таким артикулом уже существует'},
+  test('дубликат артикула превращается в ValidationException с полем',
+      () async {
+    adapter.enqueueJson(409, {
+      'code': '23505',
+      'message':
+          'duplicate key value violates unique constraint "products_sku_key"',
+      'details': 'Key (sku)=(MB-001) already exists.',
     });
 
     await expectLater(
@@ -118,24 +121,46 @@ void main() {
       ),
       throwsA(
         isA<ValidationException>()
-            .having((e) => e.errorFor('sku'), 'sku', contains('уже существует'))
+            .having((e) => e.errorFor('sku'), 'sku', contains('используется'))
             .having((e) => e.fieldErrors.length, 'fieldErrors', 1),
       ),
     );
   });
 
-  test('ответ 409 превращается в ConflictException', () async {
-    adapter.enqueueJson(
-        409, {'message': 'Нельзя удалить: к категории привязано товаров — 4'});
+  test('нарушение внешнего ключа даёт ConflictException', () async {
+    adapter.enqueueJson(409, {
+      'code': '23503',
+      'message':
+          'update or delete on table "categories" violates foreign key constraint',
+    });
 
     await expectLater(
       repo.softDelete(1),
-      throwsA(
-        isA<ConflictException>().having(
-          (e) => e.message,
-          'message',
-          contains('привязано товаров'),
+      throwsA(isA<ConflictException>()),
+    );
+  });
+
+  test('ошибка проверки поля даёт ValidationException', () async {
+    adapter.enqueueJson(400, {
+      'code': '23514',
+      'message':
+          'new row for relation "products" violates check constraint "products_price_check"',
+    });
+
+    await expectLater(
+      repo.create(
+        const Product(
+          id: 0,
+          name: 'Стул',
+          sku: 'MB-002',
+          price: 10,
+          categoryId: 2,
+          manufacturerId: 1,
         ),
+      ),
+      throwsA(
+        isA<ValidationException>()
+            .having((e) => e.errorFor('price'), 'price', isNotNull),
       ),
     );
   });
@@ -183,7 +208,7 @@ void main() {
   });
 
   test('создание товара возвращает идентификатор с сервера', () async {
-    adapter.enqueueJson(201, productJson(id: 23, name: 'Тестовый стул'));
+    adapter.enqueueJson(201, [productRow(id: 23, name: 'Тестовый стул')]);
 
     final id = await repo.create(
       const Product(
@@ -199,42 +224,70 @@ void main() {
     expect(id, 23);
     final request = adapter.requests.single;
     expect(request.method, 'POST');
-    expect(request.path, '/products');
-    expect((request.data as Map)['sku'], 'MB-999');
+    expect(request.path, 'products');
+    expect((request.data as List).first['sku'], 'MB-999');
+    expect((request.data as List).first['category_id'], 2);
   });
 
-  test('жёсткое удаление запрашивает параметр hard', () async {
+  test('материалы сохраняются отдельными строками связи', () async {
+    adapter.enqueueJson(201, [productRow(id: 24)]);
+    adapter.enqueueJson(201, const []);
+
+    await repo.create(
+      const Product(
+        id: 0,
+        name: 'Стол',
+        sku: 'MB-500',
+        price: 1000,
+        categoryId: 1,
+        manufacturerId: 1,
+        materialIds: [1, 2],
+      ),
+    );
+
+    expect(adapter.requests.length, 2);
+    final linkRequest = adapter.requests[1];
+    expect(linkRequest.path, 'product_materials');
+    expect((linkRequest.data as List).length, 2);
+  });
+
+  test('жёсткое удаление удаляет строку по идентификатору', () async {
     adapter.enqueue(const MockResponse(204));
 
     await repo.hardDelete(5);
 
     final request = adapter.requests.single;
     expect(request.method, 'DELETE');
-    expect(request.path, '/products/5');
-    expect(request.query['hard'], 'true');
+    expect(request.path, 'products');
+    expect(request.query['id'], 'eq.5');
   });
 
-  test('восстановление идёт отдельным маршрутом', () async {
-    adapter.enqueueJson(200, productJson());
+  test('восстановление очищает дату удаления', () async {
+    adapter.enqueueJson(200, [productRow()]);
 
     await repo.restore(5);
 
     final request = adapter.requests.single;
-    expect(request.method, 'POST');
-    expect(request.path, '/products/5/restore');
+    expect(request.method, 'PATCH');
+    expect(request.path, 'products');
+    expect(request.query['id'], 'eq.5');
+    expect((request.data as Map)['deleted_at'], isNull);
   });
 
-  test('множественное удаление возвращает число удалённых', () async {
-    adapter.enqueueJson(200, {'deleted': 2});
+  test('множественное удаление возвращает число изменённых строк', () async {
+    adapter.enqueueJson(200, [
+      {'id': 1},
+      {'id': 2},
+    ]);
 
     final count = await repo.deleteMany([1, 2, 3]);
 
     expect(count, 2);
-    expect(adapter.requests.single.path, '/products/bulk-delete');
+    expect(adapter.requests.single.query['id'], 'in.(1,2,3)');
   });
 
   test('несуществующий товар даёт null, а не исключение', () async {
-    adapter.enqueueJson(404, {'message': 'Объект не найден'});
+    adapter.enqueue(listResponse([], 0));
 
     final found = await repo.findById(999);
 

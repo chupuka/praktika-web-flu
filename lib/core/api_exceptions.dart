@@ -62,6 +62,38 @@ class ValidationException extends ApiException {
   String? errorFor(String field) => fieldErrors[field];
 }
 
+String _camel(String field) {
+  final parts = field.split('_');
+  if (parts.length == 1) return field;
+  return parts.first +
+      parts
+          .skip(1)
+          .map((p) => p.isEmpty ? p : p[0].toUpperCase() + p.substring(1))
+          .join();
+}
+
+String? _fieldFromUnique(Object? details) {
+  final text = details?.toString() ?? '';
+  final match = RegExp(r'Key \((.+?)\)=').firstMatch(text);
+  if (match == null) return null;
+  final raw = match
+      .group(1)!
+      .replaceAll(RegExp(r'lower\(|upper\('), '')
+      .replaceAll(')', '');
+  return _camel(raw.trim());
+}
+
+String? _fieldFromConstraint(Object? message) {
+  final text = message?.toString() ?? '';
+  final column = RegExp(r'column "([^"]+)"').firstMatch(text);
+  if (column != null) return _camel(column.group(1)!);
+  final named = RegExp(r'constraint "([^"]+)"').firstMatch(text);
+  if (named == null) return null;
+  final parts = named.group(1)!.split('_');
+  if (parts.length < 3) return null;
+  return _camel(parts.sublist(1, parts.length - 1).join('_'));
+}
+
 ApiException mapHttpError(int statusCode, dynamic data) {
   String message = 'Ошибка запроса';
   final errors = <String, String>{};
@@ -74,6 +106,34 @@ ApiException mapHttpError(int statusCode, dynamic data) {
       for (final entry in rawErrors.entries) {
         errors[entry.key.toString()] = entry.value.toString();
       }
+    }
+
+    final code = data['code']?.toString();
+    if (code == '23505') {
+      final field = _fieldFromUnique(data['details']);
+      if (field != null) {
+        return ValidationException(
+          'Проверьте заполнение полей',
+          {field: 'Такое значение уже используется'},
+        );
+      }
+      return const ConflictException('Запись с такими данными уже существует');
+    }
+    if (code == '23503') {
+      return const ConflictException(
+        'Запись используется в других данных и не может быть изменена',
+      );
+    }
+    if (code == '23514' || code == '23502' || code == '22P02') {
+      final field = _fieldFromConstraint(data['message']) ??
+          _fieldFromConstraint(data['details']);
+      if (field != null) {
+        return ValidationException(
+          'Проверьте заполнение полей',
+          {field: 'Недопустимое значение'},
+        );
+      }
+      return const ValidationException('Проверьте заполнение полей', {});
     }
   }
 

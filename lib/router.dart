@@ -2,6 +2,7 @@ import 'package:go_router/go_router.dart';
 
 import 'auth/permissions.dart';
 import 'models/category_query.dart';
+import 'models/order_query.dart';
 import 'models/product_query.dart';
 import 'screens/admin/admin_stats_screen.dart';
 import 'screens/admin/admin_users_screen.dart';
@@ -18,6 +19,10 @@ import 'screens/manager_home_screen.dart';
 import 'screens/manufacturer_form_screen.dart';
 import 'screens/material_form_screen.dart';
 import 'screens/not_found_screen.dart';
+import 'screens/orders/my_orders_screen.dart';
+import 'screens/orders/order_detail_screen.dart';
+import 'screens/orders/order_form_screen.dart';
+import 'screens/orders/order_list_screen.dart';
 import 'screens/product_detail_screen.dart';
 import 'screens/product_form_screen.dart';
 import 'screens/product_list_screen.dart';
@@ -110,6 +115,41 @@ GoRouter buildRouter(AuthNotifier auth) {
         builder: (context, state) => const AdminStatsScreen(),
         redirect: (context, state) =>
             auth.can(Permission.viewStatistics) ? null : _forbidden(state),
+      ),
+      GoRoute(
+        path: '/orders',
+        builder: (context, state) => OrderListScreen(
+          initialQuery: OrderQuery.fromParameters(state.uri.queryParameters),
+        ),
+        redirect: (context, state) =>
+            auth.can(Permission.viewOrders) ? null : _forbidden(state),
+        routes: [
+          GoRoute(
+            path: 'new',
+            builder: (context, state) => const OrderFormScreen(),
+          ),
+          GoRoute(
+            path: ':id',
+            builder: (context, state) => OrderDetailScreen(
+              id: int.tryParse(state.pathParameters['id'] ?? ''),
+            ),
+          ),
+        ],
+      ),
+      GoRoute(
+        path: '/my-orders',
+        builder: (context, state) => const MyOrdersScreen(),
+        redirect: (context, state) =>
+            auth.can(Permission.viewOwnOrders) ? null : _forbidden(state),
+        routes: [
+          GoRoute(
+            path: ':id',
+            builder: (context, state) => OrderDetailScreen(
+              id: int.tryParse(state.pathParameters['id'] ?? ''),
+              mine: true,
+            ),
+          ),
+        ],
       ),
       GoRoute(
         path: '/products',

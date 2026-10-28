@@ -65,6 +65,22 @@ class AppShell extends StatelessWidget {
           icon: Icons.card_membership_outlined,
           selectedIcon: Icons.card_membership,
         ),
+      if (auth.can(Permission.viewOwnOrders))
+        const ShellDestination(
+          path: '/my-orders',
+          label: 'Мои заказы',
+          shortLabel: 'Заказы',
+          icon: Icons.receipt_long_outlined,
+          selectedIcon: Icons.receipt_long,
+        ),
+      if (auth.can(Permission.viewOrders))
+        const ShellDestination(
+          path: '/orders',
+          label: 'Заказы',
+          shortLabel: 'Заказы',
+          icon: Icons.receipt_long_outlined,
+          selectedIcon: Icons.receipt_long,
+        ),
       if (auth.has(Role.manager))
         const ShellDestination(
           path: '/manage',
@@ -105,6 +121,12 @@ class AppShell extends StatelessWidget {
     }
     if (path.startsWith('/profile')) {
       return destinations.indexWhere((d) => d.path == '/profile');
+    }
+    if (path.startsWith('/my-orders')) {
+      return destinations.indexWhere((d) => d.path == '/my-orders');
+    }
+    if (path.startsWith('/orders')) {
+      return destinations.indexWhere((d) => d.path == '/orders');
     }
     for (final prefix in [
       '/manage',

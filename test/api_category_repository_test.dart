@@ -15,7 +15,7 @@ void main() {
   late ApiClient client;
   late ApiCategoryRepository categories;
 
-  Map<String, dynamic> categoryJson({
+  Map<String, dynamic> categoryRow({
     int id = 1,
     String name = 'Диваны и кресла',
   }) {
@@ -23,18 +23,19 @@ void main() {
       'id': id,
       'name': name,
       'description': 'Мягкая мебель',
-      'deletedAt': null,
+      'created_at': '2026-10-28T13:49:36.711Z',
+      'deleted_at': null,
     };
   }
 
-  Map<String, dynamic> page(List<Map<String, dynamic>> items, int total) {
-    return {
-      'items': items,
-      'page': 1,
-      'size': 10,
-      'total': total,
-      'totalPages': 1,
-    };
+  MockResponse listResponse(List<Map<String, dynamic>> rows, int total) {
+    return MockResponse(
+      200,
+      body: rows,
+      headers: {
+        'content-range': ['0-${rows.length - 1}/$total'],
+      },
+    );
   }
 
   setUp(() {
@@ -45,9 +46,11 @@ void main() {
   });
 
   test('список категорий приходит с сервера', () async {
-    adapter.enqueueJson(
-      200,
-      page([categoryJson(), categoryJson(id: 2, name: 'Столы и стулья')], 8),
+    adapter.enqueue(
+      listResponse(
+        [categoryRow(), categoryRow(id: 2, name: 'Столы и стулья')],
+        8,
+      ),
     );
 
     final result = await categories.find(const CategoryQuery());
@@ -57,16 +60,16 @@ void main() {
     expect(result.items.first.name, 'Диваны и кресла');
   });
 
-  test('поиск уходит на сервер параметром search', () async {
-    adapter.enqueueJson(200, page([categoryJson(id: 4)], 1));
+  test('поиск уходит на сервер фильтром or', () async {
+    adapter.enqueue(listResponse([categoryRow(id: 4)], 1));
 
     await categories.find(const CategoryQuery(search: 'шкаф'));
 
-    expect(adapter.requests.single.query['search'], 'шкаф');
+    expect(adapter.requests.single.query['or'], contains('name.ilike.*шкаф*'));
   });
 
   test('создание категории возвращает идентификатор', () async {
-    adapter.enqueueJson(201, categoryJson(id: 9, name: 'Свободная'));
+    adapter.enqueueJson(201, [categoryRow(id: 9, name: 'Свободная')]);
 
     final id = await categories.create(
       const Category(id: 0, name: 'Свободная'),
@@ -74,20 +77,22 @@ void main() {
 
     expect(id, 9);
     expect(adapter.requests.single.method, 'POST');
-    expect(adapter.requests.single.path, '/categories');
+    expect(adapter.requests.single.path, 'categories');
   });
 
-  test('дубликат имени даёт 422 с полем name', () async {
-    adapter.enqueueJson(422, {
-      'message': 'Ошибка валидации',
-      'errors': {'name': 'Такая категория уже существует'},
+  test('дубликат имени даёт поле name', () async {
+    adapter.enqueueJson(409, {
+      'code': '23505',
+      'message':
+          'duplicate key value violates unique constraint "categories_name_key"',
+      'details': 'Key (lower(name))=(Диваны и кресла) already exists.',
     });
 
     await expectLater(
       categories.create(const Category(id: 0, name: 'Диваны и кресла')),
       throwsA(
         isA<ValidationException>().having(
-            (e) => e.errorFor('name'), 'name', contains('уже существует')),
+            (e) => e.errorFor('name'), 'name', contains('используется')),
       ),
     );
   });

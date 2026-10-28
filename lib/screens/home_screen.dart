@@ -25,7 +25,7 @@ class HomeScreen extends StatelessWidget {
     final expiresAt = auth.sessionExpiresAt;
     final wide = MediaQuery.sizeOf(context).width >= 700;
     return AppShell(
-      title: 'Мебельный магазин',
+      title: 'Mebel.',
       actions: [
         RoleBadge(role: user.role),
         if (wide) ...[
@@ -125,13 +125,28 @@ class HomeScreen extends StatelessWidget {
                             subtitle: 'Профиль и бонусная карта покупателя',
                             onTap: () => context.go('/profile'),
                           ),
+                        if (auth.can(Permission.viewOwnOrders))
+                          _MenuTile(
+                            width: width,
+                            icon: Icons.receipt_long_outlined,
+                            title: 'Мои заказы',
+                            subtitle: 'История заказов и суммы со скидкой',
+                            onTap: () => context.go('/my-orders'),
+                          ),
+                        if (auth.can(Permission.viewOrders))
+                          _MenuTile(
+                            width: width,
+                            icon: Icons.receipt_long_outlined,
+                            title: 'Заказы',
+                            subtitle: 'Оформление и обработка заказов',
+                            onTap: () => context.go('/orders'),
+                          ),
                         if (auth.has(Role.manager))
                           _MenuTile(
                             width: width,
                             icon: Icons.work_outline,
                             title: 'Рабочее место менеджера',
-                            subtitle:
-                                'Товары, справочники, покупатели и выдачи',
+                            subtitle: 'Товары, справочники и покупатели',
                             onTap: () => context.go('/manage'),
                           ),
                         if (auth.can(Permission.manageUsers))
@@ -147,7 +162,7 @@ class HomeScreen extends StatelessWidget {
                             width: width,
                             icon: Icons.insights_outlined,
                             title: 'Статистика',
-                            subtitle: 'Сводка по каталогу и пользователям',
+                            subtitle: 'Выручка, склад и распределение товаров',
                             onTap: () => context.go('/admin/stats'),
                           ),
                       ],

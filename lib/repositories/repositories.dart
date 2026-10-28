@@ -9,9 +9,13 @@ import '../models/manufacturer.dart';
 import '../models/manufacturer_query.dart';
 import '../models/material.dart';
 import '../models/material_query.dart';
+import '../models/order.dart';
+import '../models/order_query.dart';
 import '../models/page_result.dart';
 import '../models/product.dart';
 import '../models/product_query.dart';
+import '../models/review.dart';
+import '../models/stats.dart';
 
 abstract interface class ProductRepository {
   Future<PageResult<Product>> find(
@@ -81,6 +85,33 @@ abstract interface class CustomerRepository {
   Future<void> hardDelete(int id);
   Future<void> restore(int id);
   Future<int> deleteMany(List<int> ids);
+}
+
+abstract interface class OrderRepository {
+  Future<PageResult<Order>> find(
+    OrderQuery query, {
+    CancelToken? cancelToken,
+  });
+  Future<Order?> findById(int id);
+  Future<int> create(Order order, List<OrderItem> items);
+  Future<void> updateStatus(int id, OrderStatus status);
+  Future<void> softDelete(int id);
+  Future<void> hardDelete(int id);
+  Future<void> restore(int id);
+  Future<int> deleteMany(List<int> ids);
+}
+
+abstract interface class ReviewRepository {
+  Future<List<Review>> findByProduct(int productId);
+  Future<void> create(Review review);
+  Future<void> softDelete(int id);
+  Future<void> hardDelete(int id);
+  Future<void> restore(int id);
+}
+
+abstract interface class StatsRepository {
+  Future<ShopStats> shop();
+  Future<List<CategoryStat>> categories();
 }
 
 abstract interface class ReferenceRepository implements Listenable {

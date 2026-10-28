@@ -3,6 +3,8 @@ import '../models/role.dart';
 enum Permission {
   viewCatalog('Просмотр каталога'),
   viewOwnProfile('Своя карточка покупателя'),
+  viewOwnOrders('Мои заказы'),
+  viewOrders('Заказы'),
   manageProducts('Управление товарами'),
   manageReferences('Справочники'),
   manageCustomers('Покупатели'),
@@ -23,12 +25,14 @@ class Permissions {
     Role.customer: {
       Permission.viewCatalog,
       Permission.viewOwnProfile,
+      Permission.viewOwnOrders,
     },
     Role.manager: {
       Permission.viewCatalog,
       Permission.manageProducts,
       Permission.manageReferences,
       Permission.manageCustomers,
+      Permission.viewOrders,
     },
     Role.admin: {
       Permission.viewCatalog,

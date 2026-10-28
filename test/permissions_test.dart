@@ -45,10 +45,26 @@ void main() {
       expect(Permissions.can(Role.manager, Permission.restoreRecords), isFalse);
     });
 
-    test('администратор наследует права менеджера', () {
+    test('администратор наследует права менеджера, кроме раздела заказов', () {
       for (final permission in Permissions.forRole(Role.manager)) {
+        if (permission == Permission.viewOrders) continue;
         expect(Permissions.can(Role.admin, permission), isTrue);
       }
+      expect(Permissions.can(Role.admin, Permission.viewOrders), isFalse);
+    });
+
+    test('у каждой роли есть раздел, недоступный остальным', () {
+      expect(Permissions.can(Role.customer, Permission.viewOwnOrders), isTrue);
+      expect(Permissions.can(Role.manager, Permission.viewOwnOrders), isFalse);
+      expect(Permissions.can(Role.admin, Permission.viewOwnOrders), isFalse);
+
+      expect(Permissions.can(Role.manager, Permission.viewOrders), isTrue);
+      expect(Permissions.can(Role.customer, Permission.viewOrders), isFalse);
+      expect(Permissions.can(Role.admin, Permission.viewOrders), isFalse);
+
+      expect(Permissions.can(Role.admin, Permission.manageUsers), isTrue);
+      expect(Permissions.can(Role.manager, Permission.manageUsers), isFalse);
+      expect(Permissions.can(Role.customer, Permission.manageUsers), isFalse);
     });
 
     test('матрица прав не выдаёт менеджеру прав администратора', () {

@@ -12,7 +12,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class FakeAuthRepository implements AuthRepository {
   AppUser user = const AppUser(
-    id: 3,
+    id: '3',
     username: 'customer',
     fullName: 'Иванова Мария Петровна',
     email: 'kreslo.ivanovna@gmail.com',

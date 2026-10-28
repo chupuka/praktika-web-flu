@@ -19,13 +19,18 @@ class ApiClient {
                 connectTimeout: ApiConfig.connectTimeout,
                 receiveTimeout: ApiConfig.receiveTimeout,
                 validateStatus: (status) => status != null && status < 500,
-                headers: {'Content-Type': 'application/json'},
+                headers: {
+                  'Content-Type': 'application/json',
+                  'apikey': ApiConfig.anonKey,
+                },
               ),
             ) {
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) {
-          if (_accessToken != null && _accessToken!.isNotEmpty) {
+          if (_accessToken != null &&
+              _accessToken!.isNotEmpty &&
+              options.headers['Authorization'] == null) {
             options.headers['Authorization'] = 'Bearer $_accessToken';
           }
           handler.next(options);
@@ -81,6 +86,96 @@ class ApiClient {
           return _unwrap(response);
         },
       ),
+    );
+  }
+
+  Future<Response<T>> getRaw<T>(
+    String path, {
+    Map<String, dynamic>? queryParameters,
+    Map<String, String>? headers,
+    CancelToken? cancelToken,
+    bool checkStatus = true,
+  }) {
+    return _withRetry(
+      () => guard(
+        () async {
+          final response = await _dio.get<T>(
+            path,
+            queryParameters: queryParameters,
+            options: Options(headers: headers),
+            cancelToken: cancelToken,
+          );
+          if (checkStatus) _ensureOk(response);
+          return response;
+        },
+      ),
+    );
+  }
+
+  Future<Response<T>> postRaw<T>(
+    String path, {
+    Object? data,
+    Map<String, dynamic>? queryParameters,
+    Map<String, String>? headers,
+    CancelToken? cancelToken,
+    bool checkStatus = true,
+  }) {
+    return guard(
+      () async {
+        final response = await _dio.post<T>(
+          path,
+          data: data,
+          queryParameters: queryParameters,
+          options: Options(headers: headers),
+          cancelToken: cancelToken,
+        );
+        if (checkStatus) _ensureOk(response);
+        return response;
+      },
+    );
+  }
+
+  Future<Response<T>> patchRaw<T>(
+    String path, {
+    Object? data,
+    Map<String, dynamic>? queryParameters,
+    Map<String, String>? headers,
+    CancelToken? cancelToken,
+    bool checkStatus = true,
+  }) {
+    return guard(
+      () async {
+        final response = await _dio.patch<T>(
+          path,
+          data: data,
+          queryParameters: queryParameters,
+          options: Options(headers: headers),
+          cancelToken: cancelToken,
+        );
+        if (checkStatus) _ensureOk(response);
+        return response;
+      },
+    );
+  }
+
+  Future<Response<T>> deleteRaw<T>(
+    String path, {
+    Map<String, dynamic>? queryParameters,
+    Map<String, String>? headers,
+    CancelToken? cancelToken,
+    bool checkStatus = true,
+  }) {
+    return guard(
+      () async {
+        final response = await _dio.delete<T>(
+          path,
+          queryParameters: queryParameters,
+          options: Options(headers: headers),
+          cancelToken: cancelToken,
+        );
+        if (checkStatus) _ensureOk(response);
+        return response;
+      },
     );
   }
 

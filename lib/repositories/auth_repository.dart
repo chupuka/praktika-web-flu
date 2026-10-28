@@ -42,6 +42,6 @@ abstract interface class AuthRepository {
 
 abstract interface class UserRepository {
   Future<PageResult<AppUser>> find({int page = 1, int size = 50});
-  Future<AppUser> changeRole(int id, Role role);
-  Future<void> delete(int id);
+  Future<AppUser> changeRole(String id, Role role);
+  Future<void> delete(String id);
 }

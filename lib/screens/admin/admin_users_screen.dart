@@ -168,7 +168,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
             return SingleChildScrollView(
               child: EntityTable<AppUser>(
                 items: _users,
-                idOf: (user) => user.id,
+                idOf: (user) => user.id.hashCode,
                 columns: [
                   TableColumnSpec(
                       label: 'Логин', build: (u) => Text(u.username)),

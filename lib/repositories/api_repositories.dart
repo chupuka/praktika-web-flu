@@ -5,7 +5,6 @@ import 'package:flutter/foundation.dart' show ChangeNotifier;
 
 import '../core/api_client.dart';
 import '../core/api_config.dart';
-import '../core/api_exceptions.dart';
 import '../models/category.dart';
 import '../models/category_query.dart';
 import '../models/customer.dart';
@@ -14,38 +13,167 @@ import '../models/manufacturer.dart';
 import '../models/manufacturer_query.dart';
 import '../models/material.dart';
 import '../models/material_query.dart';
+import '../models/order.dart';
+import '../models/order_query.dart';
 import '../models/page_result.dart';
 import '../models/product.dart';
 import '../models/product_query.dart';
+import '../models/review.dart';
+import '../models/stats.dart';
 import 'repositories.dart';
 
-Map<String, dynamic> _queryParams(Map<String, String> params) {
+const _countHeader = {'Prefer': 'count=exact'};
+const _representation = {'Prefer': 'return=representation'};
+
+({List<dynamic> rows, int total}) _readPage(
+  Response<dynamic> response, {
+  required int page,
+  required int size,
+}) {
+  final rows = (response.data as List?) ?? const [];
+  final range = response.headers.value('content-range') ?? '';
+  final total = int.tryParse(range.split('/').last) ?? rows.length;
+  return (rows: rows, total: total);
+}
+
+Map<String, dynamic> _filters(Map<String, String?> entries) {
   final result = <String, dynamic>{};
-  for (final entry in params.entries) {
-    if (entry.value.isEmpty) continue;
-    result[entry.key] = entry.value;
+  for (final entry in entries.entries) {
+    if (entry.value != null && entry.value!.isNotEmpty) {
+      result[entry.key] = entry.value;
+    }
   }
   return result;
 }
 
-class _Page {
-  final List<dynamic> items;
-  final int page;
-  final int size;
-  final int total;
-
-  const _Page(this.items, this.page, this.size, this.total);
+String? _searchOr(String value, List<String> fields) {
+  final term = value.trim().replaceAll(',', ' ').replaceAll('(', ' ');
+  if (term.isEmpty) return null;
+  return '(${fields.map((f) => '$f.ilike.*$term*').join(',')})';
 }
 
-_Page _parsePage(dynamic data) {
-  final map = Map<String, dynamic>.from(data as Map);
-  final raw = (map['items'] as List?) ?? const [];
-  return _Page(
-    raw,
-    (map['page'] as num?)?.toInt() ?? 1,
-    (map['size'] as num?)?.toInt() ?? 10,
-    (map['total'] as num?)?.toInt() ?? raw.length,
+String _order(String field, bool ascending) {
+  final column = switch (field) {
+    'fullName' => 'full_name',
+    'contactEmail' => 'contact_email',
+    'createdAt' => 'created_at',
+    _ => field,
+  };
+  return '$column.${ascending ? 'asc' : 'desc'}';
+}
+
+String? _deletedFilter(bool includeDeleted) =>
+    includeDeleted ? null : 'is.null';
+
+Map<String, dynamic> _productJson(Map<String, dynamic> row) {
+  final materials = (row['product_materials'] as List?) ?? const [];
+  return {
+    'id': row['id'],
+    'name': row['name'],
+    'sku': row['sku'],
+    'description': row['description'],
+    'style': row['style'],
+    'price': row['price'],
+    'stock': row['stock'],
+    'width': row['width'],
+    'depth': row['depth'],
+    'height': row['height'],
+    'weight': row['weight'],
+    'color': row['color'],
+    'categoryId': row['category_id'],
+    'manufacturerId': row['manufacturer_id'],
+    'materialIds': [
+      for (final link in materials)
+        if (link is Map && link['material_id'] != null)
+          (link['material_id'] as num).toInt(),
+    ],
+    'deletedAt': row['deleted_at'],
+  };
+}
+
+Map<String, dynamic> _categoryJson(Map<String, dynamic> row) => {
+      'id': row['id'],
+      'name': row['name'],
+      'description': row['description'],
+      'deletedAt': row['deleted_at'],
+    };
+
+Map<String, dynamic> _manufacturerJson(Map<String, dynamic> row) => {
+      'id': row['id'],
+      'name': row['name'],
+      'country': row['country'],
+      'contactEmail': row['contact_email'],
+      'deletedAt': row['deleted_at'],
+    };
+
+Map<String, dynamic> _materialJson(Map<String, dynamic> row) => {
+      'id': row['id'],
+      'name': row['name'],
+      'description': row['description'],
+      'deletedAt': row['deleted_at'],
+    };
+
+Map<String, dynamic> _customerJson(Map<String, dynamic> row) {
+  final rawCards = row['loyalty_cards'];
+  final card = rawCards is List
+      ? (rawCards.isEmpty ? null : rawCards.first as Map)
+      : rawCards as Map?;
+  return {
+    'id': row['id'],
+    'fullName': row['full_name'],
+    'email': row['email'],
+    'phone': row['phone'],
+    'address': row['address'],
+    'card': card == null
+        ? null
+        : {
+            'number': card['number'],
+            'issuedAt': card['issued_at'],
+            'tier': card['tier'],
+            'points': card['points'],
+          },
+    'deletedAt': row['deleted_at'],
+  };
+}
+
+Future<List<dynamic>> _insert(
+  ApiClient client,
+  String table,
+  List<Map<String, dynamic>> rows, {
+  bool representation = true,
+}) async {
+  if (rows.isEmpty) return const [];
+  final response = await client.postRaw<dynamic>(
+    table,
+    data: rows,
+    headers: representation ? _representation : null,
   );
+  return (response.data as List?) ?? const [];
+}
+
+Future<int> _deleteWhere(
+  ApiClient client,
+  String table,
+  Map<String, dynamic> query,
+) async {
+  final response =
+      await client.deleteRaw<dynamic>(table, queryParameters: query);
+  return (response.data as List?)?.length ?? 0;
+}
+
+Future<int> _patchWhere(
+  ApiClient client,
+  String table,
+  Map<String, dynamic> body,
+  Map<String, dynamic> query,
+) async {
+  final response = await client.patchRaw<dynamic>(
+    table,
+    data: body,
+    queryParameters: query,
+    headers: _representation,
+  );
+  return (response.data as List?)?.length ?? 0;
 }
 
 class ApiProductRepository implements ProductRepository {
@@ -58,102 +186,144 @@ class ApiProductRepository implements ProductRepository {
     ProductQuery query, {
     CancelToken? cancelToken,
   }) async {
-    final data = await _client.get<dynamic>(
-      '/products',
-      queryParameters: _queryParams(query.toParameters()),
+    final response = await _client.getRaw<dynamic>(
+      'products',
+      queryParameters: {
+        'select': '*,product_materials(material_id)',
+        'order': _order(query.sortField, query.sortAscending),
+        'limit': '${query.size}',
+        'offset': '${(query.page - 1) * query.size}',
+        ..._filters({
+          'deleted_at': _deletedFilter(query.includeDeleted),
+          'category_id':
+              query.categoryId == null ? null : 'eq.${query.categoryId}',
+          'manufacturer_id': query.manufacturerId == null
+              ? null
+              : 'eq.${query.manufacturerId}',
+          'style': query.style,
+          'stock': query.inStockOnly ? 'gt.0' : null,
+          if (query.priceFrom != null && query.priceTo == null)
+            'price': 'gte.${query.priceFrom}',
+          if (query.priceFrom == null && query.priceTo != null)
+            'price': 'lte.${query.priceTo}',
+          if (query.priceFrom != null && query.priceTo != null)
+            'and': '(price.gte.${query.priceFrom},price.lte.${query.priceTo})',
+        }),
+        if (_searchOr(query.search, ['name', 'sku', 'description', 'color'])
+            case final or?)
+          'or': or,
+      },
+      headers: _countHeader,
       cancelToken: cancelToken,
     );
-    final page = _parsePage(data);
+    final page = _readPage(response, page: query.page, size: query.size);
     return PageResult(
-      items: page.items
-          .map((e) => Product.fromJson(Map<String, dynamic>.from(e as Map)))
-          .toList(),
-      page: page.page,
-      size: page.size,
+      items: [
+        for (final row in page.rows)
+          Product.fromJson(_productJson(Map<String, dynamic>.from(row as Map))),
+      ],
+      page: query.page,
+      size: query.size,
       total: page.total,
     );
   }
 
   @override
   Future<Product?> findById(int id) async {
-    try {
-      final data = await _client.get<dynamic>('/products/$id');
-      return Product.fromJson(Map<String, dynamic>.from(data as Map));
-    } on NotFoundException {
-      return null;
-    }
+    final response = await _client.getRaw<dynamic>(
+      'products',
+      queryParameters: {
+        'select': '*,product_materials(material_id)',
+        'id': 'eq.$id',
+        'limit': '1',
+      },
+    );
+    final rows = (response.data as List?) ?? const [];
+    if (rows.isEmpty) return null;
+    return Product.fromJson(
+      _productJson(Map<String, dynamic>.from(rows.first as Map)),
+    );
   }
 
   @override
   Future<int> create(Product product) async {
-    final data =
-        await _client.post<dynamic>('/products', data: _toJson(product));
-    return (Map<String, dynamic>.from(data as Map)['id'] as num?)?.toInt() ?? 0;
-  }
-
-  Future<List<Product>> findAll() async {
-    final data = await _client.get<dynamic>(
-      '/products',
-      queryParameters: {'size': 100},
-    );
-    final page = _parsePage(data);
-    return page.items
-        .map((e) => Product.fromJson(Map<String, dynamic>.from(e as Map)))
-        .toList();
+    final rows = await _insert(_client, 'products', [_productBody(product)]);
+    final id = ((rows.first as Map)['id'] as num).toInt();
+    await _writeMaterials(id, product.materialIds);
+    return id;
   }
 
   @override
   Future<void> update(Product product) async {
-    await _client.put<dynamic>(
-      '/products/${product.id}',
-      data: _toJson(product),
+    await _patchWhere(
+      _client,
+      'products',
+      _productBody(product),
+      {'id': 'eq.${product.id}'},
+    );
+    await _deleteWhere(_client, 'product_materials', {
+      'product_id': 'eq.${product.id}',
+    });
+    await _writeMaterials(product.id, product.materialIds);
+  }
+
+  Future<void> _writeMaterials(int productId, List<int> ids) async {
+    if (ids.isEmpty) return;
+    await _client.postRaw<dynamic>(
+      'product_materials',
+      data: [
+        for (final id in ids) {'product_id': productId, 'material_id': id},
+      ],
     );
   }
 
   @override
   Future<void> softDelete(int id) async {
-    await _client.delete('/products/$id');
+    await _patchWhere(
+      _client,
+      'products',
+      {'deleted_at': DateTime.now().toUtc().toIso8601String()},
+      {'id': 'eq.$id'},
+    );
   }
 
   @override
   Future<void> hardDelete(int id) async {
-    await _client.delete('/products/$id', queryParameters: {'hard': 'true'});
+    await _deleteWhere(_client, 'products', {'id': 'eq.$id'});
   }
 
   @override
   Future<void> restore(int id) async {
-    await _client.post<dynamic>('/products/$id/restore');
+    await _patchWhere(
+        _client, 'products', {'deleted_at': null}, {'id': 'eq.$id'});
   }
 
   @override
   Future<int> deleteMany(List<int> ids) async {
-    final data = await _client.post<dynamic>(
-      '/products/bulk-delete',
-      data: {'ids': ids},
+    if (ids.isEmpty) return 0;
+    return _patchWhere(
+      _client,
+      'products',
+      {'deleted_at': DateTime.now().toUtc().toIso8601String()},
+      {'id': 'in.(${ids.join(',')})'},
     );
-    return (Map<String, dynamic>.from(data as Map)['deleted'] as num?)
-            ?.toInt() ??
-        0;
   }
 
-  Map<String, dynamic> _toJson(Product p) {
-    return {
-      'name': p.name,
-      'sku': p.sku,
-      'description': p.description,
-      'style': p.style,
-      'price': p.price,
-      'stock': p.stock,
-      'width': p.width,
-      'depth': p.depth,
-      'height': p.height,
-      'weight': p.weight,
-      'color': p.color,
-      'categoryId': p.categoryId,
-      'manufacturerId': p.manufacturerId,
-      'materialIds': p.materialIds,
-    };
-  }
+  Map<String, dynamic> _productBody(Product p) => {
+        'name': p.name,
+        'sku': p.sku,
+        'description': p.description,
+        'style': p.style,
+        'price': p.price,
+        'stock': p.stock,
+        'width': p.width,
+        'depth': p.depth,
+        'height': p.height,
+        'weight': p.weight,
+        'color': p.color,
+        'category_id': p.categoryId,
+        'manufacturer_id': p.manufacturerId,
+      };
 }
 
 class ApiCategoryRepository implements CategoryRepository {
@@ -166,84 +336,94 @@ class ApiCategoryRepository implements CategoryRepository {
     CategoryQuery query, {
     CancelToken? cancelToken,
   }) async {
-    final data = await _client.get<dynamic>(
-      '/categories',
-      queryParameters: _queryParams(query.toParameters()),
+    final response = await _client.getRaw<dynamic>(
+      'categories',
+      queryParameters: {
+        'select': '*',
+        'order': _order(query.sortField, query.sortAscending),
+        'limit': '${query.size}',
+        'offset': '${(query.page - 1) * query.size}',
+        ..._filters({'deleted_at': _deletedFilter(query.includeDeleted)}),
+        if (_searchOr(query.search, ['name', 'description']) case final or?)
+          'or': or,
+      },
+      headers: _countHeader,
       cancelToken: cancelToken,
     );
-    final page = _parsePage(data);
+    final page = _readPage(response, page: query.page, size: query.size);
     return PageResult(
-      items: page.items
-          .map((e) => Category.fromJson(Map<String, dynamic>.from(e as Map)))
-          .toList(),
-      page: page.page,
-      size: page.size,
+      items: [
+        for (final row in page.rows)
+          Category.fromJson(
+              _categoryJson(Map<String, dynamic>.from(row as Map))),
+      ],
+      page: query.page,
+      size: query.size,
       total: page.total,
     );
   }
 
   @override
   Future<Category?> findById(int id) async {
-    try {
-      final data = await _client.get<dynamic>('/categories/$id');
-      return Category.fromJson(Map<String, dynamic>.from(data as Map));
-    } on NotFoundException {
-      return null;
-    }
+    final response = await _client.getRaw<dynamic>(
+      'categories',
+      queryParameters: {'select': '*', 'id': 'eq.$id', 'limit': '1'},
+    );
+    final rows = (response.data as List?) ?? const [];
+    if (rows.isEmpty) return null;
+    return Category.fromJson(
+      _categoryJson(Map<String, dynamic>.from(rows.first as Map)),
+    );
   }
 
   @override
   Future<int> create(Category category) async {
-    final data = await _client.post<dynamic>(
-      '/categories',
-      data: {'name': category.name, 'description': category.description},
-    );
-    return (Map<String, dynamic>.from(data as Map)['id'] as num?)?.toInt() ?? 0;
-  }
-
-  Future<List<Category>> findAll() async {
-    final data = await _client.get<dynamic>(
-      '/categories',
-      queryParameters: {'size': 100},
-    );
-    final page = _parsePage(data);
-    return page.items
-        .map((e) => Category.fromJson(Map<String, dynamic>.from(e as Map)))
-        .toList();
+    final rows = await _insert(_client, 'categories', [
+      {'name': category.name, 'description': category.description},
+    ]);
+    return ((rows.first as Map)['id'] as num).toInt();
   }
 
   @override
   Future<void> update(Category category) async {
-    await _client.put<dynamic>(
-      '/categories/${category.id}',
-      data: {'name': category.name, 'description': category.description},
+    await _patchWhere(
+      _client,
+      'categories',
+      {'name': category.name, 'description': category.description},
+      {'id': 'eq.${category.id}'},
     );
   }
 
   @override
   Future<void> softDelete(int id) async {
-    await _client.delete('/categories/$id');
+    await _patchWhere(
+      _client,
+      'categories',
+      {'deleted_at': DateTime.now().toUtc().toIso8601String()},
+      {'id': 'eq.$id'},
+    );
   }
 
   @override
   Future<void> hardDelete(int id) async {
-    await _client.delete('/categories/$id', queryParameters: {'hard': 'true'});
+    await _deleteWhere(_client, 'categories', {'id': 'eq.$id'});
   }
 
   @override
   Future<void> restore(int id) async {
-    await _client.post<dynamic>('/categories/$id/restore');
+    await _patchWhere(
+        _client, 'categories', {'deleted_at': null}, {'id': 'eq.$id'});
   }
 
   @override
   Future<int> deleteMany(List<int> ids) async {
-    final data = await _client.post<dynamic>(
-      '/categories/bulk-delete',
-      data: {'ids': ids},
+    if (ids.isEmpty) return 0;
+    return _patchWhere(
+      _client,
+      'categories',
+      {'deleted_at': DateTime.now().toUtc().toIso8601String()},
+      {'id': 'in.(${ids.join(',')})'},
     );
-    return (Map<String, dynamic>.from(data as Map)['deleted'] as num?)
-            ?.toInt() ??
-        0;
   }
 }
 
@@ -257,96 +437,107 @@ class ApiManufacturerRepository implements ManufacturerRepository {
     ManufacturerQuery query, {
     CancelToken? cancelToken,
   }) async {
-    final data = await _client.get<dynamic>(
-      '/manufacturers',
-      queryParameters: _queryParams(query.toParameters()),
+    final response = await _client.getRaw<dynamic>(
+      'manufacturers',
+      queryParameters: {
+        'select': '*',
+        'order': _order(query.sortField, query.sortAscending),
+        'limit': '${query.size}',
+        'offset': '${(query.page - 1) * query.size}',
+        ..._filters({'deleted_at': _deletedFilter(query.includeDeleted)}),
+        if (_searchOr(query.search, ['name', 'country']) case final or?)
+          'or': or,
+      },
+      headers: _countHeader,
       cancelToken: cancelToken,
     );
-    final page = _parsePage(data);
+    final page = _readPage(response, page: query.page, size: query.size);
     return PageResult(
-      items: page.items
-          .map(
-              (e) => Manufacturer.fromJson(Map<String, dynamic>.from(e as Map)))
-          .toList(),
-      page: page.page,
-      size: page.size,
+      items: [
+        for (final row in page.rows)
+          Manufacturer.fromJson(
+            _manufacturerJson(Map<String, dynamic>.from(row as Map)),
+          ),
+      ],
+      page: query.page,
+      size: query.size,
       total: page.total,
     );
   }
 
   @override
   Future<Manufacturer?> findById(int id) async {
-    try {
-      final data = await _client.get<dynamic>('/manufacturers/$id');
-      return Manufacturer.fromJson(Map<String, dynamic>.from(data as Map));
-    } on NotFoundException {
-      return null;
-    }
+    final response = await _client.getRaw<dynamic>(
+      'manufacturers',
+      queryParameters: {'select': '*', 'id': 'eq.$id', 'limit': '1'},
+    );
+    final rows = (response.data as List?) ?? const [];
+    if (rows.isEmpty) return null;
+    return Manufacturer.fromJson(
+      _manufacturerJson(Map<String, dynamic>.from(rows.first as Map)),
+    );
   }
 
   @override
   Future<int> create(Manufacturer manufacturer) async {
-    final data = await _client.post<dynamic>(
-      '/manufacturers',
-      data: {
+    final rows = await _insert(_client, 'manufacturers', [
+      {
         'name': manufacturer.name,
         'country': manufacturer.country,
-        'contactEmail': manufacturer.contactEmail,
+        'contact_email': manufacturer.contactEmail,
       },
-    );
-    return (Map<String, dynamic>.from(data as Map)['id'] as num?)?.toInt() ?? 0;
-  }
-
-  Future<List<Manufacturer>> findAll() async {
-    final data = await _client.get<dynamic>(
-      '/manufacturers',
-      queryParameters: {'size': 100},
-    );
-    final page = _parsePage(data);
-    return page.items
-        .map((e) => Manufacturer.fromJson(Map<String, dynamic>.from(e as Map)))
-        .toList();
+    ]);
+    return ((rows.first as Map)['id'] as num).toInt();
   }
 
   @override
   Future<void> update(Manufacturer manufacturer) async {
-    await _client.put<dynamic>(
-      '/manufacturers/${manufacturer.id}',
-      data: {
+    await _patchWhere(
+      _client,
+      'manufacturers',
+      {
         'name': manufacturer.name,
         'country': manufacturer.country,
-        'contactEmail': manufacturer.contactEmail,
+        'contact_email': manufacturer.contactEmail,
       },
+      {'id': 'eq.${manufacturer.id}'},
     );
   }
 
   @override
   Future<void> softDelete(int id) async {
-    await _client.delete('/manufacturers/$id');
+    await _patchWhere(
+      _client,
+      'manufacturers',
+      {'deleted_at': DateTime.now().toUtc().toIso8601String()},
+      {'id': 'eq.$id'},
+    );
   }
 
   @override
   Future<void> hardDelete(int id) async {
-    await _client.delete(
-      '/manufacturers/$id',
-      queryParameters: {'hard': 'true'},
-    );
+    await _deleteWhere(_client, 'manufacturers', {'id': 'eq.$id'});
   }
 
   @override
   Future<void> restore(int id) async {
-    await _client.post<dynamic>('/manufacturers/$id/restore');
+    await _patchWhere(
+      _client,
+      'manufacturers',
+      {'deleted_at': null},
+      {'id': 'eq.$id'},
+    );
   }
 
   @override
   Future<int> deleteMany(List<int> ids) async {
-    final data = await _client.post<dynamic>(
-      '/manufacturers/bulk-delete',
-      data: {'ids': ids},
+    if (ids.isEmpty) return 0;
+    return _patchWhere(
+      _client,
+      'manufacturers',
+      {'deleted_at': DateTime.now().toUtc().toIso8601String()},
+      {'id': 'in.(${ids.join(',')})'},
     );
-    return (Map<String, dynamic>.from(data as Map)['deleted'] as num?)
-            ?.toInt() ??
-        0;
   }
 }
 
@@ -360,92 +551,95 @@ class ApiMaterialRepository implements MaterialRepository {
     MaterialQuery query, {
     CancelToken? cancelToken,
   }) async {
-    final data = await _client.get<dynamic>(
-      '/materials',
-      queryParameters: _queryParams(query.toParameters()),
+    final response = await _client.getRaw<dynamic>(
+      'materials',
+      queryParameters: {
+        'select': '*',
+        'order': _order(query.sortField, query.sortAscending),
+        'limit': '${query.size}',
+        'offset': '${(query.page - 1) * query.size}',
+        ..._filters({'deleted_at': _deletedFilter(query.includeDeleted)}),
+        if (_searchOr(query.search, ['name', 'description']) case final or?)
+          'or': or,
+      },
+      headers: _countHeader,
       cancelToken: cancelToken,
     );
-    final page = _parsePage(data);
+    final page = _readPage(response, page: query.page, size: query.size);
     return PageResult(
-      items: page.items
-          .map(
-            (e) => FurnitureMaterial.fromJson(
-              Map<String, dynamic>.from(e as Map),
-            ),
-          )
-          .toList(),
-      page: page.page,
-      size: page.size,
+      items: [
+        for (final row in page.rows)
+          FurnitureMaterial.fromJson(
+            _materialJson(Map<String, dynamic>.from(row as Map)),
+          ),
+      ],
+      page: query.page,
+      size: query.size,
       total: page.total,
     );
   }
 
   @override
   Future<FurnitureMaterial?> findById(int id) async {
-    try {
-      final data = await _client.get<dynamic>('/materials/$id');
-      return FurnitureMaterial.fromJson(Map<String, dynamic>.from(data as Map));
-    } on NotFoundException {
-      return null;
-    }
+    final response = await _client.getRaw<dynamic>(
+      'materials',
+      queryParameters: {'select': '*', 'id': 'eq.$id', 'limit': '1'},
+    );
+    final rows = (response.data as List?) ?? const [];
+    if (rows.isEmpty) return null;
+    return FurnitureMaterial.fromJson(
+      _materialJson(Map<String, dynamic>.from(rows.first as Map)),
+    );
   }
 
   @override
   Future<int> create(FurnitureMaterial material) async {
-    final data = await _client.post<dynamic>(
-      '/materials',
-      data: {'name': material.name, 'description': material.description},
-    );
-    return (Map<String, dynamic>.from(data as Map)['id'] as num?)?.toInt() ?? 0;
-  }
-
-  Future<List<FurnitureMaterial>> findAll() async {
-    final data = await _client.get<dynamic>(
-      '/materials',
-      queryParameters: {'size': 100},
-    );
-    final page = _parsePage(data);
-    return page.items
-        .map(
-          (e) => FurnitureMaterial.fromJson(
-            Map<String, dynamic>.from(e as Map),
-          ),
-        )
-        .toList();
+    final rows = await _insert(_client, 'materials', [
+      {'name': material.name, 'description': material.description},
+    ]);
+    return ((rows.first as Map)['id'] as num).toInt();
   }
 
   @override
   Future<void> update(FurnitureMaterial material) async {
-    await _client.put<dynamic>(
-      '/materials/${material.id}',
-      data: {'name': material.name, 'description': material.description},
+    await _patchWhere(
+      _client,
+      'materials',
+      {'name': material.name, 'description': material.description},
+      {'id': 'eq.${material.id}'},
     );
   }
 
   @override
   Future<void> softDelete(int id) async {
-    await _client.delete('/materials/$id');
+    await _patchWhere(
+      _client,
+      'materials',
+      {'deleted_at': DateTime.now().toUtc().toIso8601String()},
+      {'id': 'eq.$id'},
+    );
   }
 
   @override
   Future<void> hardDelete(int id) async {
-    await _client.delete('/materials/$id', queryParameters: {'hard': 'true'});
+    await _deleteWhere(_client, 'materials', {'id': 'eq.$id'});
   }
 
   @override
   Future<void> restore(int id) async {
-    await _client.post<dynamic>('/materials/$id/restore');
+    await _patchWhere(
+        _client, 'materials', {'deleted_at': null}, {'id': 'eq.$id'});
   }
 
   @override
   Future<int> deleteMany(List<int> ids) async {
-    final data = await _client.post<dynamic>(
-      '/materials/bulk-delete',
-      data: {'ids': ids},
+    if (ids.isEmpty) return 0;
+    return _patchWhere(
+      _client,
+      'materials',
+      {'deleted_at': DateTime.now().toUtc().toIso8601String()},
+      {'id': 'in.(${ids.join(',')})'},
     );
-    return (Map<String, dynamic>.from(data as Map)['deleted'] as num?)
-            ?.toInt() ??
-        0;
   }
 }
 
@@ -459,101 +653,377 @@ class ApiCustomerRepository implements CustomerRepository {
     CustomerQuery query, {
     CancelToken? cancelToken,
   }) async {
-    final data = await _client.get<dynamic>(
-      '/customers',
-      queryParameters: _queryParams(query.toParameters()),
+    final response = await _client.getRaw<dynamic>(
+      'customers',
+      queryParameters: {
+        'select': '*,loyalty_cards(number,issued_at,tier,points)',
+        'order': _order(query.sortField, query.sortAscending),
+        'limit': '${query.size}',
+        'offset': '${(query.page - 1) * query.size}',
+        ..._filters({'deleted_at': _deletedFilter(query.includeDeleted)}),
+        if (_searchOr(query.search, ['full_name', 'email', 'phone'])
+            case final or?)
+          'or': or,
+      },
+      headers: _countHeader,
       cancelToken: cancelToken,
     );
-    final page = _parsePage(data);
+    final page = _readPage(response, page: query.page, size: query.size);
     return PageResult(
-      items: page.items
-          .map((e) => Customer.fromJson(Map<String, dynamic>.from(e as Map)))
-          .toList(),
-      page: page.page,
-      size: page.size,
+      items: [
+        for (final row in page.rows)
+          Customer.fromJson(
+              _customerJson(Map<String, dynamic>.from(row as Map))),
+      ],
+      page: query.page,
+      size: query.size,
       total: page.total,
     );
   }
 
   @override
   Future<Customer?> findById(int id) async {
-    try {
-      final data = await _client.get<dynamic>('/customers/$id');
-      return Customer.fromJson(Map<String, dynamic>.from(data as Map));
-    } on NotFoundException {
-      return null;
-    }
+    final response = await _client.getRaw<dynamic>(
+      'customers',
+      queryParameters: {
+        'select': '*,loyalty_cards(number,issued_at,tier,points)',
+        'id': 'eq.$id',
+        'limit': '1',
+      },
+    );
+    final rows = (response.data as List?) ?? const [];
+    if (rows.isEmpty) return null;
+    return Customer.fromJson(
+      _customerJson(Map<String, dynamic>.from(rows.first as Map)),
+    );
   }
 
   @override
   Future<int> create(Customer customer) async {
-    final data = await _client.post<dynamic>(
-      '/customers',
-      data: _toJson(customer),
-    );
-    return (Map<String, dynamic>.from(data as Map)['id'] as num?)?.toInt() ?? 0;
-  }
-
-  Future<List<Customer>> findAll() async {
-    final data = await _client.get<dynamic>(
-      '/customers',
-      queryParameters: {'size': 100},
-    );
-    final page = _parsePage(data);
-    return page.items
-        .map((e) => Customer.fromJson(Map<String, dynamic>.from(e as Map)))
-        .toList();
+    final rows = await _insert(_client, 'customers', [_customerBody(customer)]);
+    final id = ((rows.first as Map)['id'] as num).toInt();
+    await _writeCard(id, customer.card);
+    return id;
   }
 
   @override
   Future<void> update(Customer customer) async {
-    await _client.put<dynamic>(
-      '/customers/${customer.id}',
-      data: _toJson(customer),
+    await _patchWhere(
+      _client,
+      'customers',
+      _customerBody(customer),
+      {'id': 'eq.${customer.id}'},
+    );
+    await _deleteWhere(_client, 'loyalty_cards', {
+      'customer_id': 'eq.${customer.id}',
+    });
+    await _writeCard(customer.id, customer.card);
+  }
+
+  Future<void> _writeCard(int customerId, CustomerCard? card) async {
+    if (card == null) return;
+    await _client.postRaw<dynamic>('loyalty_cards', data: [
+      {
+        'customer_id': customerId,
+        'number': card.number,
+        'issued_at': card.issuedAt,
+        'tier': card.tier,
+        'points': card.points,
+      },
+    ]);
+  }
+
+  @override
+  Future<void> softDelete(int id) async {
+    await _patchWhere(
+      _client,
+      'customers',
+      {'deleted_at': DateTime.now().toUtc().toIso8601String()},
+      {'id': 'eq.$id'},
+    );
+  }
+
+  @override
+  Future<void> hardDelete(int id) async {
+    await _deleteWhere(_client, 'customers', {'id': 'eq.$id'});
+  }
+
+  @override
+  Future<void> restore(int id) async {
+    await _patchWhere(
+        _client, 'customers', {'deleted_at': null}, {'id': 'eq.$id'});
+  }
+
+  @override
+  Future<int> deleteMany(List<int> ids) async {
+    if (ids.isEmpty) return 0;
+    return _patchWhere(
+      _client,
+      'customers',
+      {'deleted_at': DateTime.now().toUtc().toIso8601String()},
+      {'id': 'in.(${ids.join(',')})'},
+    );
+  }
+
+  Map<String, dynamic> _customerBody(Customer c) => {
+        'full_name': c.fullName,
+        'email': c.email,
+        'phone': c.phone,
+        'address': c.address,
+      };
+}
+
+class ApiOrderRepository implements OrderRepository {
+  final ApiClient _client;
+
+  ApiOrderRepository(this._client);
+
+  Map<String, dynamic> _itemJson(Map<String, dynamic> row) => {
+        'id': row['id'],
+        'orderId': row['order_id'],
+        'productId': row['product_id'],
+        'productName': row['product_name'],
+        'quantity': row['quantity'],
+        'price': row['price'],
+      };
+
+  Map<String, dynamic> _orderJson(Map<String, dynamic> row) => {
+        'id': row['id'],
+        'customerId': row['customer_id'],
+        'customerName': row['customer_name'],
+        'status': row['status'],
+        'deliveryMethod': row['delivery_method'],
+        'subtotal': row['subtotal'],
+        'discountPercent': row['discount_percent'],
+        'deliveryCost': row['delivery_cost'],
+        'totalPrice': row['total_price'],
+        'comment': row['comment'],
+        'createdAt': row['created_at'],
+        'deletedAt': row['deleted_at'],
+        'items': [
+          for (final item in (row['order_items'] as List?) ?? const [])
+            _itemJson(Map<String, dynamic>.from(item as Map)),
+        ],
+      };
+
+  @override
+  Future<PageResult<Order>> find(
+    OrderQuery query, {
+    CancelToken? cancelToken,
+  }) async {
+    final response = await _client.getRaw<dynamic>(
+      'orders',
+      queryParameters: {
+        'select': '*,order_items(*)',
+        'order': _order(query.sortField, query.sortAscending),
+        'limit': '${query.size}',
+        'offset': '${(query.page - 1) * query.size}',
+        ..._filters({
+          'deleted_at': _deletedFilter(query.includeDeleted),
+          'status': query.status == null ? null : 'eq.${query.status!.apiName}',
+        }),
+        if (_searchOr(query.search, ['customer_name', 'comment'])
+            case final or?)
+          'or': or,
+      },
+      headers: _countHeader,
+      cancelToken: cancelToken,
+    );
+    final page = _readPage(response, page: query.page, size: query.size);
+    return PageResult(
+      items: [
+        for (final row in page.rows)
+          Order.fromJson(_orderJson(Map<String, dynamic>.from(row as Map))),
+      ],
+      page: query.page,
+      size: query.size,
+      total: page.total,
+    );
+  }
+
+  @override
+  Future<Order?> findById(int id) async {
+    final response = await _client.getRaw<dynamic>(
+      'orders',
+      queryParameters: {
+        'select': '*,order_items(*)',
+        'id': 'eq.$id',
+        'limit': '1',
+      },
+    );
+    final rows = (response.data as List?) ?? const [];
+    if (rows.isEmpty) return null;
+    return Order.fromJson(
+      _orderJson(Map<String, dynamic>.from(rows.first as Map)),
+    );
+  }
+
+  @override
+  Future<int> create(Order order, List<OrderItem> items) async {
+    final rows = await _insert(_client, 'orders', [
+      {
+        'customer_id': order.customerId,
+        'customer_name': order.customerName,
+        'status': order.status.apiName,
+        'delivery_method': order.deliveryMethod.apiName,
+        'comment': order.comment,
+      },
+    ]);
+    final id = ((rows.first as Map)['id'] as num).toInt();
+    if (items.isNotEmpty) {
+      await _client.postRaw<dynamic>('order_items', data: [
+        for (final item in items)
+          {
+            'order_id': id,
+            'product_id': item.productId,
+            'product_name': item.productName,
+            'quantity': item.quantity,
+            'price': item.price,
+          },
+      ]);
+    }
+    return id;
+  }
+
+  @override
+  Future<void> updateStatus(int id, OrderStatus status) async {
+    await _patchWhere(
+      _client,
+      'orders',
+      {'status': status.apiName},
+      {'id': 'eq.$id'},
     );
   }
 
   @override
   Future<void> softDelete(int id) async {
-    await _client.delete('/customers/$id');
+    await _patchWhere(
+      _client,
+      'orders',
+      {'deleted_at': DateTime.now().toUtc().toIso8601String()},
+      {'id': 'eq.$id'},
+    );
   }
 
   @override
   Future<void> hardDelete(int id) async {
-    await _client.delete('/customers/$id', queryParameters: {'hard': 'true'});
+    await _deleteWhere(_client, 'orders', {'id': 'eq.$id'});
   }
 
   @override
   Future<void> restore(int id) async {
-    await _client.post<dynamic>('/customers/$id/restore');
+    await _patchWhere(
+        _client, 'orders', {'deleted_at': null}, {'id': 'eq.$id'});
   }
 
   @override
   Future<int> deleteMany(List<int> ids) async {
-    final data = await _client.post<dynamic>(
-      '/customers/bulk-delete',
-      data: {'ids': ids},
+    if (ids.isEmpty) return 0;
+    return _patchWhere(
+      _client,
+      'orders',
+      {'deleted_at': DateTime.now().toUtc().toIso8601String()},
+      {'id': 'in.(${ids.join(',')})'},
     );
-    return (Map<String, dynamic>.from(data as Map)['deleted'] as num?)
-            ?.toInt() ??
-        0;
+  }
+}
+
+class ApiReviewRepository implements ReviewRepository {
+  final ApiClient _client;
+
+  ApiReviewRepository(this._client);
+
+  Map<String, dynamic> _json(Map<String, dynamic> row) => {
+        'id': row['id'],
+        'productId': row['product_id'],
+        'customerId': row['customer_id'],
+        'customerName': row['customer_name'],
+        'rating': row['rating'],
+        'text': row['text'],
+        'createdAt': row['created_at'],
+        'deletedAt': row['deleted_at'],
+      };
+
+  @override
+  Future<List<Review>> findByProduct(int productId) async {
+    final response = await _client.getRaw<dynamic>(
+      'reviews',
+      queryParameters: {
+        'select': '*',
+        'product_id': 'eq.$productId',
+        'deleted_at': 'is.null',
+        'order': 'created_at.desc',
+      },
+    );
+    final rows = (response.data as List?) ?? const [];
+    return [
+      for (final row in rows)
+        Review.fromJson(_json(Map<String, dynamic>.from(row as Map))),
+    ];
   }
 
-  Map<String, dynamic> _toJson(Customer c) {
-    return {
-      'fullName': c.fullName,
-      'email': c.email,
-      'phone': c.phone,
-      'address': c.address,
-      'card': c.card == null
-          ? null
-          : {
-              'number': c.card!.number,
-              'issuedAt': c.card!.issuedAt,
-              'tier': c.card!.tier,
-              'points': c.card!.points,
-            },
-    };
+  @override
+  Future<void> create(Review review) async {
+    await _client.postRaw<dynamic>('reviews', data: [
+      {
+        'product_id': review.productId,
+        'customer_id': review.customerId,
+        'customer_name': review.customerName,
+        'rating': review.rating,
+        'text': review.text,
+      },
+    ]);
+  }
+
+  @override
+  Future<void> softDelete(int id) async {
+    await _patchWhere(
+      _client,
+      'reviews',
+      {'deleted_at': DateTime.now().toUtc().toIso8601String()},
+      {'id': 'eq.$id'},
+    );
+  }
+
+  @override
+  Future<void> hardDelete(int id) async {
+    await _deleteWhere(_client, 'reviews', {'id': 'eq.$id'});
+  }
+
+  @override
+  Future<void> restore(int id) async {
+    await _patchWhere(
+        _client, 'reviews', {'deleted_at': null}, {'id': 'eq.$id'});
+  }
+}
+
+class ApiStatsRepository implements StatsRepository {
+  final ApiClient _client;
+
+  ApiStatsRepository(this._client);
+
+  @override
+  Future<ShopStats> shop() async {
+    final response = await _client.getRaw<dynamic>(
+      'v_shop_stats',
+      queryParameters: const {'select': '*'},
+    );
+    final rows = (response.data as List?) ?? const [];
+    if (rows.isEmpty) return const ShopStats();
+    return ShopStats.fromJson(Map<String, dynamic>.from(rows.first as Map));
+  }
+
+  @override
+  Future<List<CategoryStat>> categories() async {
+    final response = await _client.getRaw<dynamic>(
+      'v_category_stats',
+      queryParameters: const {'select': '*'},
+    );
+    final rows = (response.data as List?) ?? const [];
+    return [
+      for (final row in rows)
+        CategoryStat.fromJson(Map<String, dynamic>.from(row as Map)),
+    ];
   }
 }
 
