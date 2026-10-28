@@ -12,7 +12,8 @@ void main() {
   test('ограничение длины строки', () {
     expect(Validators.minLength('ab', 'название', 3), contains('минимум 3'));
     expect(Validators.minLength('abc', 'название', 3), isNull);
-    expect(Validators.maxLength('abcdef', 'описание', 3), contains('не больше'));
+    expect(
+        Validators.maxLength('abcdef', 'описание', 3), contains('не больше'));
     expect(Validators.maxLength('abc', 'описание', 3), isNull);
   });
 
@@ -33,15 +34,18 @@ void main() {
     expect(Validators.positiveNumber('100', 'Цена'), isNull);
     expect(Validators.positiveNumber('0', 'Цена'), contains('больше нуля'));
     expect(Validators.positiveNumber('-5', 'Цена'), contains('больше нуля'));
-    expect(Validators.positiveNumber('abc', 'Цена'), contains('ожидается число'));
-    expect(Validators.inRange('500', 'Цена', min: 1, max: 100), contains('от 1'));
+    expect(
+        Validators.positiveNumber('abc', 'Цена'), contains('ожидается число'));
+    expect(
+        Validators.inRange('500', 'Цена', min: 1, max: 100), contains('от 1'));
     expect(Validators.inRange('50', 'Цена', min: 1, max: 100), isNull);
   });
 
   test('целые неотрицательные значения', () {
     expect(Validators.nonNegativeInt('0', 'Остаток'), isNull);
     expect(Validators.nonNegativeInt('5', 'Остаток'), isNull);
-    expect(Validators.nonNegativeInt('-1', 'Остаток'), contains('отрицательным'));
+    expect(
+        Validators.nonNegativeInt('-1', 'Остаток'), contains('отрицательным'));
     expect(Validators.positiveInt('0', 'Количество'), contains('больше нуля'));
   });
 

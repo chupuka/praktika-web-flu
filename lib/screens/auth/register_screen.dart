@@ -150,7 +150,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         validator: (value) {
                           final text = value?.trim() ?? '';
                           if (text.isEmpty) return 'Укажите логин';
-                          if (!RegExp(r'^[a-zA-Z0-9._-]{3,32}$').hasMatch(text)) {
+                          if (!RegExp(r'^[a-zA-Z0-9._-]{3,32}$')
+                              .hasMatch(text)) {
                             return 'Логин: 3–32 символа, латиница, цифры, . _ -';
                           }
                           return null;
@@ -189,7 +190,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           if (value == null || value.isEmpty) {
                             return 'Повторите пароль';
                           }
-                          if (value != _password.text) return 'Пароли не совпадают';
+                          if (value != _password.text) {
+                            return 'Пароли не совпадают';
+                          }
                           return null;
                         },
                       ),
@@ -218,7 +221,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               ? const SizedBox(
                                   width: 20,
                                   height: 20,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                  child:
+                                      CircularProgressIndicator(strokeWidth: 2),
                                 )
                               : const Text('Зарегистрироваться'),
                         ),

@@ -1,30 +1,32 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../widgets/app_shell.dart';
+
 class ManagerHomeScreen extends StatelessWidget {
   const ManagerHomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Рабочее место менеджера'),
-        leading: IconButton(
-          tooltip: 'На главную',
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/'),
-        ),
-        actions: [
+    return AppShell(
+      title: 'Рабочее место менеджера',
+      actions: [
+        if (MediaQuery.sizeOf(context).width >= 700)
           FilledButton.icon(
             onPressed: () => context.go('/products/new'),
             icon: const Icon(Icons.add),
             label: const Text('Добавить товар'),
+          )
+        else
+          IconButton(
+            tooltip: 'Добавить товар',
+            onPressed: () => context.go('/products/new'),
+            icon: const Icon(Icons.add),
           ),
-          const SizedBox(width: 12),
-        ],
-      ),
-      body: Center(
+        const SizedBox(width: 12),
+      ],
+      child: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: ConstrainedBox(

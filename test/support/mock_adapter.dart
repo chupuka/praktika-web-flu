@@ -80,9 +80,7 @@ class MockAdapter implements HttpClientAdapter {
     }
 
     final response = next as MockResponse;
-    final payload = response.body == null
-        ? ''
-        : jsonEncode(response.body);
+    final payload = response.body == null ? '' : jsonEncode(response.body);
 
     return ResponseBody.fromString(
       payload,

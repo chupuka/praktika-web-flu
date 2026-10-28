@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../models/customer.dart';
 import '../repositories/repositories.dart';
 import '../state/auth_notifier.dart';
+import '../widgets/app_shell.dart';
 import '../widgets/state_views.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -30,16 +31,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthNotifier>();
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Моя карточка'),
-        leading: IconButton(
-          tooltip: 'На главную',
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/'),
-        ),
-      ),
-      body: FutureBuilder<Customer?>(
+    return AppShell(
+      title: 'Моя карточка',
+      child: FutureBuilder<Customer?>(
         future: _future,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {

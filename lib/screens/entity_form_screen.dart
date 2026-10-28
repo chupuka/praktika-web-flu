@@ -64,7 +64,8 @@ abstract class EntityFormScreenState<T, W extends EntityFormScreen<T>>
   }
 
   TextEditingController controllerFor(String key, [String text = '']) {
-    return controllers.putIfAbsent(key, () => TextEditingController(text: text));
+    return controllers.putIfAbsent(
+        key, () => TextEditingController(text: text));
   }
 
   Map<String, TextEditingController> groupFor(

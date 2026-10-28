@@ -87,8 +87,7 @@ void main() {
       country: 'Россия',
       contactEmail: 'shop@hoff.ru',
     );
-    final restoredManufacturer =
-        Manufacturer.fromJson(manufacturer.toJson());
+    final restoredManufacturer = Manufacturer.fromJson(manufacturer.toJson());
     expect(restoredManufacturer.country, 'Россия');
     expect(restoredManufacturer.contactEmail, 'shop@hoff.ru');
 

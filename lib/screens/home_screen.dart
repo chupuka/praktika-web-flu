@@ -6,6 +6,7 @@ import '../auth/auth_config.dart';
 import '../auth/permissions.dart';
 import '../models/role.dart';
 import '../state/auth_notifier.dart';
+import '../widgets/app_shell.dart';
 import '../widgets/role_badge.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -22,25 +23,30 @@ class HomeScreen extends StatelessWidget {
     if (user == null) return const SizedBox.shrink();
     final theme = Theme.of(context);
     final expiresAt = auth.sessionExpiresAt;
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Мебельный магазин'),
-        actions: [
-          RoleBadge(role: user.role),
+    final wide = MediaQuery.sizeOf(context).width >= 700;
+    return AppShell(
+      title: 'Мебельный магазин',
+      actions: [
+        RoleBadge(role: user.role),
+        if (wide) ...[
           const SizedBox(width: 12),
-          Text(
-            user.fullName,
-            style: theme.textTheme.bodyMedium,
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 200),
+            child: Text(
+              user.fullName,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodyMedium,
+            ),
           ),
-          IconButton(
-            tooltip: 'Выйти',
-            onPressed: () => _logout(context),
-            icon: const Icon(Icons.logout),
-          ),
-          const SizedBox(width: 8),
         ],
-      ),
-      body: Center(
+        IconButton(
+          tooltip: 'Выйти',
+          onPressed: () => _logout(context),
+          icon: const Icon(Icons.logout),
+        ),
+        const SizedBox(width: 8),
+      ],
+      child: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: ConstrainedBox(
@@ -97,7 +103,7 @@ class HomeScreen extends StatelessWidget {
                 const SizedBox(height: 16),
                 LayoutBuilder(
                   builder: (context, constraints) {
-                    final width = constraints.maxWidth >= 720
+                    final width = constraints.maxWidth >= 600
                         ? (constraints.maxWidth - 16) / 2
                         : constraints.maxWidth;
                     return Wrap(
@@ -192,7 +198,8 @@ class _MenuTile extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(title, style: Theme.of(context).textTheme.titleMedium),
+                      Text(title,
+                          style: Theme.of(context).textTheme.titleMedium),
                       const SizedBox(height: 4),
                       Text(subtitle),
                     ],

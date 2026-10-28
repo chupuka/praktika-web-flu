@@ -11,8 +11,7 @@ class ManufacturerFormScreen extends EntityFormScreen<Manufacturer> {
   const ManufacturerFormScreen({super.key, super.id});
 
   @override
-  State<ManufacturerFormScreen> createState() =>
-      _ManufacturerFormScreenState();
+  State<ManufacturerFormScreen> createState() => _ManufacturerFormScreenState();
 }
 
 class _ManufacturerFormScreenState

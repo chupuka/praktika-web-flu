@@ -38,7 +38,8 @@ class NotFoundException extends ApiException {
 }
 
 class ConflictException extends ApiException {
-  const ConflictException([super.message = 'Операция конфликтует с текущим состоянием']);
+  const ConflictException(
+      [super.message = 'Операция конфликтует с текущим состоянием']);
 }
 
 class ServerException extends ApiException {

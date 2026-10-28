@@ -1,38 +1,83 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
-  <!--
-    If you are serving your web app in a path other than the root, change the
-    href value below to reflect the base path you are serving from.
-
-    The path provided below has to start and end with a slash "/" in order for
-    it to work correctly.
-
-    For more details:
-    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
-
-    This is a placeholder for base href that will be replaced by the value of
-    the `--base-href` argument provided to `flutter build`.
-  -->
   <base href="$FLUTTER_BASE_HREF">
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
+  <meta name="description" content="Мебельный магазин — каталог, справочники и заказы">
 
-  <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="mebel_web">
+  <meta name="apple-mobile-web-app-title" content="Мебельный магазин">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
-  <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
-  <title>mebel_web</title>
+  <title>Мебельный магазин</title>
   <link rel="manifest" href="manifest.json">
+
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      background-color: #fff8f5;
+      font-family: 'Segoe UI', 'Roboto', Arial, sans-serif;
+    }
+
+    #splash {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      background-color: #fff8f5;
+      color: #4e342e;
+    }
+
+    #splash .title {
+      font-size: 24px;
+      font-weight: 600;
+      letter-spacing: 0.2px;
+    }
+
+    #splash .hint {
+      font-size: 14px;
+      color: #8d6e63;
+    }
+
+    #splash .spinner {
+      width: 36px;
+      height: 36px;
+      border: 3px solid #e0cfc8;
+      border-top-color: #795548;
+      border-radius: 50%;
+      animation: splash-spin 0.9s linear infinite;
+    }
+
+    @keyframes splash-spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
 </head>
 <body>
+  <div id="splash">
+    <div class="title">Мебельный магазин</div>
+    <div class="spinner"></div>
+    <div class="hint">Загружаем каталог…</div>
+  </div>
+
+  <script>
+    window.addEventListener('flutter-first-frame', function () {
+      var splash = document.getElementById('splash');
+      if (splash) {
+        splash.remove();
+      }
+    });
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

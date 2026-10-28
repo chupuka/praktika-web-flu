@@ -45,13 +45,11 @@ class ProductQuery {
   }) {
     return ProductQuery(
       search: search ?? this.search,
-      categoryId:
-          categoryId == _unset ? this.categoryId : categoryId as int?,
+      categoryId: categoryId == _unset ? this.categoryId : categoryId as int?,
       manufacturerId: manufacturerId == _unset
           ? this.manufacturerId
           : manufacturerId as int?,
-      priceFrom:
-          priceFrom == _unset ? this.priceFrom : priceFrom as double?,
+      priceFrom: priceFrom == _unset ? this.priceFrom : priceFrom as double?,
       priceTo: priceTo == _unset ? this.priceTo : priceTo as double?,
       style: style == _unset ? this.style : style as String?,
       inStockOnly: inStockOnly ?? this.inStockOnly,

@@ -95,7 +95,8 @@ void main() {
 
     await repo.find(const ProductQuery());
 
-    expect(adapter.requests.single.headers['Authorization'], 'Bearer токен-123');
+    expect(
+        adapter.requests.single.headers['Authorization'], 'Bearer токен-123');
   });
 
   test('ответ 422 превращается в ValidationException с полями', () async {
@@ -124,7 +125,8 @@ void main() {
   });
 
   test('ответ 409 превращается в ConflictException', () async {
-    adapter.enqueueJson(409, {'message': 'Нельзя удалить: к категории привязано товаров — 4'});
+    adapter.enqueueJson(
+        409, {'message': 'Нельзя удалить: к категории привязано товаров — 4'});
 
     await expectLater(
       repo.softDelete(1),
@@ -241,7 +243,10 @@ void main() {
 
   test('отменённый запрос не превращается в ошибку сети', () async {
     adapter.enqueueError(
-      DioException(requestOptions: RequestOptions(), type: DioExceptionType.cancel, error: 'отменён'),
+      DioException(
+          requestOptions: RequestOptions(),
+          type: DioExceptionType.cancel,
+          error: 'отменён'),
     );
 
     await expectLater(
@@ -250,6 +255,3 @@ void main() {
     );
   });
 }
-
-
-

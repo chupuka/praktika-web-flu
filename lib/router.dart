@@ -90,30 +90,26 @@ GoRouter buildRouter(AuthNotifier auth) {
       GoRoute(
         path: '/profile',
         builder: (context, state) => const ProfileScreen(),
-        redirect: (context, state) => auth.can(Permission.viewOwnProfile)
-            ? null
-            : _forbidden(state),
+        redirect: (context, state) =>
+            auth.can(Permission.viewOwnProfile) ? null : _forbidden(state),
       ),
       GoRoute(
         path: '/manage',
         builder: (context, state) => const ManagerHomeScreen(),
-        redirect: (context, state) => auth.can(Permission.manageProducts)
-            ? null
-            : _forbidden(state),
+        redirect: (context, state) =>
+            auth.can(Permission.manageProducts) ? null : _forbidden(state),
       ),
       GoRoute(
         path: '/admin/users',
         builder: (context, state) => const AdminUsersScreen(),
-        redirect: (context, state) => auth.can(Permission.manageUsers)
-            ? null
-            : _forbidden(state),
+        redirect: (context, state) =>
+            auth.can(Permission.manageUsers) ? null : _forbidden(state),
       ),
       GoRoute(
         path: '/admin/stats',
         builder: (context, state) => const AdminStatsScreen(),
-        redirect: (context, state) => auth.can(Permission.viewStatistics)
-            ? null
-            : _forbidden(state),
+        redirect: (context, state) =>
+            auth.can(Permission.viewStatistics) ? null : _forbidden(state),
       ),
       GoRoute(
         path: '/products',
@@ -146,8 +142,7 @@ GoRouter buildRouter(AuthNotifier auth) {
       GoRoute(
         path: '/categories',
         builder: (context, state) => CategoryListScreen(
-          initialQuery:
-              CategoryQuery.fromParameters(state.uri.queryParameters),
+          initialQuery: CategoryQuery.fromParameters(state.uri.queryParameters),
         ),
         redirect: (context, state) =>
             auth.can(Permission.manageReferences) ? null : _forbidden(state),

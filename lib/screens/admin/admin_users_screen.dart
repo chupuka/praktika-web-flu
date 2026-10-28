@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/api_exceptions.dart';
@@ -7,6 +6,7 @@ import '../../models/app_user.dart';
 import '../../models/role.dart';
 import '../../repositories/auth_repository.dart';
 import '../../state/load_status.dart';
+import '../../widgets/app_shell.dart';
 import '../../widgets/confirm_dialog.dart';
 import '../../widgets/entity_table.dart';
 import '../../widgets/state_views.dart';
@@ -102,16 +102,9 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Пользователи и роли'),
-        leading: IconButton(
-          tooltip: 'На главную',
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/'),
-        ),
-      ),
-      body: Center(
+    return AppShell(
+      title: 'Пользователи и роли',
+      child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1100),
           child: Padding(
@@ -162,39 +155,99 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
         if (_users.isEmpty) {
           return const EmptyView(text: 'Пользователей нет.');
         }
-        return SingleChildScrollView(
-          child: EntityTable<AppUser>(
-            items: _users,
-            idOf: (user) => user.id,
-            columns: [
-              TableColumnSpec(label: 'Логин', build: (u) => Text(u.username)),
-              TableColumnSpec(label: 'Имя', build: (u) => Text(u.fullName)),
-              TableColumnSpec(label: 'Почта', build: (u) => Text(u.email)),
-              TableColumnSpec(
-                label: 'Роль',
-                build: (u) => DropdownButton<Role>(
-                  value: u.role,
-                  underline: const SizedBox.shrink(),
-                  items: [
-                    for (final role in Role.values)
-                      DropdownMenuItem(
-                        value: role,
-                        child: Text(role.label),
-                      ),
-                  ],
-                  onChanged: (role) => _changeRole(u, role),
-                ),
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            if (constraints.maxWidth < 600) {
+              return ListView.separated(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                itemCount: _users.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 8),
+                itemBuilder: (context, index) => _userCard(_users[index]),
+              );
+            }
+            return SingleChildScrollView(
+              child: EntityTable<AppUser>(
+                items: _users,
+                idOf: (user) => user.id,
+                columns: [
+                  TableColumnSpec(
+                      label: 'Логин', build: (u) => Text(u.username)),
+                  TableColumnSpec(label: 'Имя', build: (u) => Text(u.fullName)),
+                  TableColumnSpec(
+                    label: 'Почта',
+                    build: (u) => Text(
+                      u.email,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  TableColumnSpec(
+                    label: 'Роль',
+                    build: (u) => _roleDropdown(u),
+                  ),
+                ],
+                actions: (u) => [_deleteButton(u)],
               ),
-            ],
-            actions: (u) => [
-              IconButton(
-                tooltip: 'Удалить',
-                icon: const Icon(Icons.person_remove_outlined),
-                onPressed: () => _delete(u),
-              ),
-            ],
-          ),
+            );
+          },
         );
     }
+  }
+
+  Widget _userCard(AppUser user) {
+    final theme = Theme.of(context);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              user.fullName,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.titleSmall,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              '${user.username} · ${user.email}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodySmall,
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(child: _roleDropdown(user)),
+                _deleteButton(user),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _roleDropdown(AppUser user) {
+    return DropdownButton<Role>(
+      value: user.role,
+      isExpanded: true,
+      underline: const SizedBox.shrink(),
+      items: [
+        for (final role in Role.values)
+          DropdownMenuItem(
+            value: role,
+            child: Text(role.label),
+          ),
+      ],
+      onChanged: (role) => _changeRole(user, role),
+    );
+  }
+
+  Widget _deleteButton(AppUser user) {
+    return IconButton(
+      tooltip: 'Удалить',
+      icon: const Icon(Icons.person_remove_outlined),
+      onPressed: () => _delete(user),
+    );
   }
 }

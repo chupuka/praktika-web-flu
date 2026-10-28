@@ -86,7 +86,8 @@ class ApiProductRepository implements ProductRepository {
 
   @override
   Future<int> create(Product product) async {
-    final data = await _client.post<dynamic>('/products', data: _toJson(product));
+    final data =
+        await _client.post<dynamic>('/products', data: _toJson(product));
     return (Map<String, dynamic>.from(data as Map)['id'] as num?)?.toInt() ?? 0;
   }
 
@@ -130,7 +131,8 @@ class ApiProductRepository implements ProductRepository {
       '/products/bulk-delete',
       data: {'ids': ids},
     );
-    return (Map<String, dynamic>.from(data as Map)['deleted'] as num?)?.toInt() ??
+    return (Map<String, dynamic>.from(data as Map)['deleted'] as num?)
+            ?.toInt() ??
         0;
   }
 
@@ -239,7 +241,8 @@ class ApiCategoryRepository implements CategoryRepository {
       '/categories/bulk-delete',
       data: {'ids': ids},
     );
-    return (Map<String, dynamic>.from(data as Map)['deleted'] as num?)?.toInt() ??
+    return (Map<String, dynamic>.from(data as Map)['deleted'] as num?)
+            ?.toInt() ??
         0;
   }
 }
@@ -262,7 +265,8 @@ class ApiManufacturerRepository implements ManufacturerRepository {
     final page = _parsePage(data);
     return PageResult(
       items: page.items
-          .map((e) => Manufacturer.fromJson(Map<String, dynamic>.from(e as Map)))
+          .map(
+              (e) => Manufacturer.fromJson(Map<String, dynamic>.from(e as Map)))
           .toList(),
       page: page.page,
       size: page.size,
@@ -340,7 +344,8 @@ class ApiManufacturerRepository implements ManufacturerRepository {
       '/manufacturers/bulk-delete',
       data: {'ids': ids},
     );
-    return (Map<String, dynamic>.from(data as Map)['deleted'] as num?)?.toInt() ??
+    return (Map<String, dynamic>.from(data as Map)['deleted'] as num?)
+            ?.toInt() ??
         0;
   }
 }
@@ -438,7 +443,8 @@ class ApiMaterialRepository implements MaterialRepository {
       '/materials/bulk-delete',
       data: {'ids': ids},
     );
-    return (Map<String, dynamic>.from(data as Map)['deleted'] as num?)?.toInt() ??
+    return (Map<String, dynamic>.from(data as Map)['deleted'] as num?)
+            ?.toInt() ??
         0;
   }
 }
@@ -528,7 +534,8 @@ class ApiCustomerRepository implements CustomerRepository {
       '/customers/bulk-delete',
       data: {'ids': ids},
     );
-    return (Map<String, dynamic>.from(data as Map)['deleted'] as num?)?.toInt() ??
+    return (Map<String, dynamic>.from(data as Map)['deleted'] as num?)
+            ?.toInt() ??
         0;
   }
 
@@ -613,7 +620,10 @@ class ApiReferenceRepository extends ChangeNotifier
 
   @override
   List<Category> categories() {
-    return [for (final c in _categoryRows) if (!c.isDeleted) c];
+    return [
+      for (final c in _categoryRows)
+        if (!c.isDeleted) c
+    ];
   }
 
   @override
@@ -626,7 +636,10 @@ class ApiReferenceRepository extends ChangeNotifier
 
   @override
   List<Manufacturer> manufacturers() {
-    return [for (final m in _manufacturerRows) if (!m.isDeleted) m];
+    return [
+      for (final m in _manufacturerRows)
+        if (!m.isDeleted) m
+    ];
   }
 
   @override
@@ -639,7 +652,10 @@ class ApiReferenceRepository extends ChangeNotifier
 
   @override
   List<FurnitureMaterial> materials() {
-    return [for (final m in _materialRows) if (!m.isDeleted) m];
+    return [
+      for (final m in _materialRows)
+        if (!m.isDeleted) m
+    ];
   }
 
   @override

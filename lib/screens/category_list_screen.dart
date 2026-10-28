@@ -8,6 +8,7 @@ import '../models/category_query.dart';
 import '../repositories/repositories.dart';
 import '../state/category_list_notifier.dart';
 import '../state/load_status.dart';
+import '../widgets/app_shell.dart';
 import '../widgets/confirm_dialog.dart';
 import '../widgets/entity_table.dart';
 import '../widgets/labeled_field.dart';
@@ -28,8 +29,7 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
   @override
   void initState() {
     super.initState();
-    _searchController =
-        TextEditingController(text: widget.initialQuery.search);
+    _searchController = TextEditingController(text: widget.initialQuery.search);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context
           .read<CategoryListNotifier>()
@@ -68,24 +68,24 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
   Widget build(BuildContext context) {
     final notifier = context.watch<CategoryListNotifier>();
     final refs = context.watch<ReferenceRepository>();
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Категории'),
-        leading: IconButton(
-          tooltip: 'На главную',
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/'),
-        ),
-        actions: [
+    return AppShell(
+      title: 'Категории',
+      actions: [
+        if (MediaQuery.sizeOf(context).width >= 600)
           FilledButton.icon(
             onPressed: () => context.go('/categories/new'),
             icon: const Icon(Icons.add),
             label: const Text('Добавить'),
+          )
+        else
+          IconButton(
+            tooltip: 'Добавить категорию',
+            onPressed: () => context.go('/categories/new'),
+            icon: const Icon(Icons.add),
           ),
-          const SizedBox(width: 12),
-        ],
-      ),
-      body: Center(
+        const SizedBox(width: 12),
+      ],
+      child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 900),
           child: Padding(
@@ -123,7 +123,8 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
                     children: [
                       Text('Выбрано: ${notifier.selected.length}'),
                       const SizedBox(width: 12),
-                      FilledButton.tonal(                          onPressed: () async {
+                      FilledButton.tonal(
+                        onPressed: () async {
                           final ok = await confirmDialog(
                             context,
                             'Удалить выбранные категории?',
@@ -185,8 +186,7 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
                           child: ListTile(
                             leading: Checkbox(
                               value: notifier.selected.contains(c.id),
-                              onChanged: (_) =>
-                                  notifier.toggleSelection(c.id),
+                              onChanged: (_) => notifier.toggleSelection(c.id),
                             ),
                             title: Text(
                               c.name + (c.isDeleted ? ' (удалена)' : ''),
@@ -205,10 +205,8 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
                                   )
                                 : IconButton(
                                     tooltip: 'Удалить',
-                                    icon:
-                                        const Icon(Icons.delete_outline),
-                                    onPressed: () =>
-                                        _tryDelete(c, notifier),
+                                    icon: const Icon(Icons.delete_outline),
+                                    onPressed: () => _tryDelete(c, notifier),
                                   ),
                             onTap: () => context.go('/categories/${c.id}'),
                           ),
@@ -239,8 +237,7 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
                     sortField: notifier.query.sortField,
                     sortAscending: notifier.query.sortAscending,
                     onSort: (f) {
-                      final same =
-                          notifier.query.sortField == f;
+                      final same = notifier.query.sortField == f;
                       _go(notifier.query.copyWith(
                         sortField: f,
                         sortAscending:

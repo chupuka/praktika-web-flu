@@ -7,6 +7,7 @@ import '../models/page_result.dart';
 import '../repositories/repositories.dart';
 import '../state/auth_notifier.dart';
 import '../state/load_status.dart';
+import '../widgets/app_shell.dart';
 import '../widgets/confirm_dialog.dart';
 import '../widgets/entity_table.dart';
 import '../widgets/labeled_field.dart';
@@ -175,24 +176,24 @@ class _EntityListScreenState<T> extends State<EntityListScreen<T>> {
   @override
   Widget build(BuildContext context) {
     final isAdmin = context.watch<AuthNotifier>().can(Permission.hardDelete);
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.title),
-        leading: IconButton(
-          tooltip: 'На главную',
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/'),
-        ),
-        actions: [
+    return AppShell(
+      title: widget.title,
+      actions: [
+        if (MediaQuery.sizeOf(context).width >= 600)
           FilledButton.icon(
             onPressed: () => context.go('${widget.basePath}/new'),
             icon: const Icon(Icons.add),
             label: Text(widget.createLabel),
+          )
+        else
+          IconButton(
+            tooltip: widget.createLabel,
+            onPressed: () => context.go('${widget.basePath}/new'),
+            icon: const Icon(Icons.add),
           ),
-          const SizedBox(width: 12),
-        ],
-      ),
-      body: Center(
+        const SizedBox(width: 12),
+      ],
+      child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1100),
           child: Padding(
@@ -318,65 +319,136 @@ class _EntityListScreenState<T> extends State<EntityListScreen<T>> {
             },
           );
         }
-        return Column(
-          children: [
-            Expanded(
-              child: EntityTable<T>(
-                items: result.items,
-                idOf: widget.idOf,
-                selected: _selected,
-                onToggleSelect: (id) {
-                  setState(() {
-                    _selected.contains(id)
-                        ? _selected.remove(id)
-                        : _selected.add(id);
-                  });
-                },
-                onSelectAll: (value) {
-                  setState(() {
-                    if (value ?? false) {
-                      _selected.addAll(result.items.map(widget.idOf));
-                    } else {
-                      _selected.clear();
-                    }
-                  });
-                },
-                sortField: _sortField,
-                sortAscending: _ascending,
-                onSort: _setSort,
-                actions: (item) => _rowActions(item, isAdmin),
-                columns: [
-                  for (final column in widget.columns)
-                    TableColumnSpec<T>(
-                      label: column.label,
-                      sortField: column.sortField,
-                      numeric: column.numeric,
-                      build: (item) => column.build(item, context),
-                    ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 8),
-            PaginationBar(
-              page: result.page,
-              totalPages: result.totalPages,
-              total: result.total,
-              size: result.size,
-              onPage: (page) {
-                setState(() => _page = page);
-                _reload();
-              },
-              onSize: (size) {
-                setState(() {
-                  _size = size;
-                  _page = 1;
-                });
-                _reload();
-              },
-            ),
-          ],
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final narrow = constraints.maxWidth < 600;
+            return Column(
+              children: [
+                Expanded(
+                  child: narrow
+                      ? _buildCards(result, isAdmin)
+                      : EntityTable<T>(
+                          items: result.items,
+                          idOf: widget.idOf,
+                          selected: _selected,
+                          onToggleSelect: (id) {
+                            setState(() {
+                              _selected.contains(id)
+                                  ? _selected.remove(id)
+                                  : _selected.add(id);
+                            });
+                          },
+                          onSelectAll: (value) {
+                            setState(() {
+                              if (value ?? false) {
+                                _selected.addAll(result.items.map(widget.idOf));
+                              } else {
+                                _selected.clear();
+                              }
+                            });
+                          },
+                          sortField: _sortField,
+                          sortAscending: _ascending,
+                          onSort: _setSort,
+                          actions: (item) => _rowActions(item, isAdmin),
+                          columns: [
+                            for (final column in widget.columns)
+                              TableColumnSpec<T>(
+                                label: column.label,
+                                sortField: column.sortField,
+                                numeric: column.numeric,
+                                build: (item) => column.build(item, context),
+                              ),
+                          ],
+                        ),
+                ),
+                const SizedBox(height: 8),
+                PaginationBar(
+                  page: result.page,
+                  totalPages: result.totalPages,
+                  total: result.total,
+                  size: result.size,
+                  onPage: (page) {
+                    setState(() => _page = page);
+                    _reload();
+                  },
+                  onSize: (size) {
+                    setState(() {
+                      _size = size;
+                      _page = 1;
+                    });
+                    _reload();
+                  },
+                ),
+              ],
+            );
+          },
         );
     }
+  }
+
+  Widget _buildCards(PageResult<T> result, bool isAdmin) {
+    final theme = Theme.of(context);
+    return ListView.separated(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      itemCount: result.items.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      itemBuilder: (context, index) {
+        final item = result.items[index];
+        final id = widget.idOf(item);
+        return Card(
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Checkbox(
+                      value: _selected.contains(id),
+                      onChanged: (_) {
+                        setState(() {
+                          _selected.contains(id)
+                              ? _selected.remove(id)
+                              : _selected.add(id);
+                        });
+                      },
+                    ),
+                    Expanded(
+                      child: widget.columns.isEmpty
+                          ? Text('Запись $id',
+                              style: theme.textTheme.titleSmall)
+                          : DefaultTextStyle.merge(
+                              style: theme.textTheme.titleSmall ??
+                                  const TextStyle(),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              child: widget.columns.first.build(item, context),
+                            ),
+                    ),
+                  ],
+                ),
+                for (final column in widget.columns.skip(1)) ...[
+                  Text(
+                    column.label,
+                    style: theme.textTheme.labelSmall,
+                  ),
+                  column.build(item, context),
+                  const SizedBox(height: 6),
+                ],
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: _rowActions(item, isAdmin),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   List<Widget> _rowActions(T item, bool isAdmin) {

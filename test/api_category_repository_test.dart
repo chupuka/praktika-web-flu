@@ -86,8 +86,8 @@ void main() {
     await expectLater(
       categories.create(const Category(id: 0, name: 'Диваны и кресла')),
       throwsA(
-        isA<ValidationException>()
-            .having((e) => e.errorFor('name'), 'name', contains('уже существует')),
+        isA<ValidationException>().having(
+            (e) => e.errorFor('name'), 'name', contains('уже существует')),
       ),
     );
   });
@@ -150,4 +150,3 @@ void main() {
     expect(PageResult<int>.empty().totalPages, 1);
   });
 }
-

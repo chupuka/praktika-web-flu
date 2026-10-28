@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/api_exceptions.dart';
@@ -12,6 +11,7 @@ import '../../models/product_query.dart';
 import '../../repositories/auth_repository.dart';
 import '../../repositories/repositories.dart';
 import '../../state/load_status.dart';
+import '../../widgets/app_shell.dart';
 import '../../widgets/state_views.dart';
 
 class AdminStatsScreen extends StatefulWidget {
@@ -40,9 +40,8 @@ class _AdminStatsScreenState extends State<AdminStatsScreen> {
     try {
       final products =
           context.read<ProductRepository>().find(const ProductQuery(size: 1));
-      final categories = context
-          .read<CategoryRepository>()
-          .find(const CategoryQuery(size: 1));
+      final categories =
+          context.read<CategoryRepository>().find(const CategoryQuery(size: 1));
       final manufacturers = context
           .read<ManufacturerRepository>()
           .find(const ManufacturerQuery(size: 1));
@@ -87,16 +86,9 @@ class _AdminStatsScreenState extends State<AdminStatsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Статистика'),
-        leading: IconButton(
-          tooltip: 'На главную',
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/'),
-        ),
-      ),
-      body: Center(
+    return AppShell(
+      title: 'Статистика',
+      child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 900),
           child: Padding(

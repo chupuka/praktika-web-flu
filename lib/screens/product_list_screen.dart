@@ -10,6 +10,7 @@ import '../repositories/repositories.dart';
 import '../state/auth_notifier.dart';
 import '../state/load_status.dart';
 import '../state/product_list_notifier.dart';
+import '../widgets/app_shell.dart';
 import '../widgets/confirm_dialog.dart';
 import '../widgets/entity_table.dart';
 import '../widgets/labeled_field.dart';
@@ -32,8 +33,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
   @override
   void initState() {
     super.initState();
-    _searchController =
-        TextEditingController(text: widget.initialQuery.search);
+    _searchController = TextEditingController(text: widget.initialQuery.search);
     _priceFromController = TextEditingController(
       text: widget.initialQuery.priceFrom?.toInt().toString() ?? '',
     );
@@ -91,33 +91,37 @@ class _ProductListScreenState extends State<ProductListScreen> {
     final auth = context.watch<AuthNotifier>();
     final canManage = auth.can(Permission.manageProducts);
     final isAdmin = auth.can(Permission.hardDelete);
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Каталог товаров'),
-        leading: IconButton(
-          tooltip: 'На главную',
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/'),
-        ),
-        actions: [
-          if (canManage) ...[
+    return AppShell(
+      title: 'Каталог товаров',
+      actions: [
+        if (canManage) ...[
+          if (MediaQuery.sizeOf(context).width >= 600)
             FilledButton.icon(
               onPressed: () => context.go('/products/new'),
               icon: const Icon(Icons.add),
               label: const Text('Добавить'),
+            )
+          else
+            IconButton(
+              tooltip: 'Добавить товар',
+              onPressed: () => context.go('/products/new'),
+              icon: const Icon(Icons.add),
             ),
-            const SizedBox(width: 12),
-          ] else
-            const Padding(
-              padding: EdgeInsets.only(right: 16),
-              child: Chip(
-                avatar: Icon(Icons.visibility_outlined, size: 16),
-                label: Text('Только просмотр'),
-              ),
+        ] else if (MediaQuery.sizeOf(context).width >= 600)
+          const Padding(
+            padding: EdgeInsets.only(right: 16),
+            child: Chip(
+              avatar: Icon(Icons.visibility_outlined, size: 16),
+              label: Text('Только просмотр'),
             ),
-        ],
-      ),
-      body: Center(
+          )
+        else
+          const Padding(
+            padding: EdgeInsets.only(right: 12),
+            child: Icon(Icons.visibility_outlined),
+          ),
+      ],
+      child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1100),
           child: Padding(
@@ -485,8 +489,7 @@ class _FilterPanel extends StatelessWidget {
                       for (final c in refs.categories())
                         DropdownMenuItem(value: c.id, child: Text(c.name)),
                     ],
-                    onChanged: (v) =>
-                        onChanged(query.copyWith(categoryId: v)),
+                    onChanged: (v) => onChanged(query.copyWith(categoryId: v)),
                   ),
                 ),
               ),
@@ -564,8 +567,7 @@ class _FilterPanel extends StatelessWidget {
               FilterChip(
                 label: const Text('В наличии'),
                 selected: query.inStockOnly,
-                onSelected: (v) =>
-                    onChanged(query.copyWith(inStockOnly: v)),
+                onSelected: (v) => onChanged(query.copyWith(inStockOnly: v)),
               ),
               if (showDeleted)
                 FilterChip(

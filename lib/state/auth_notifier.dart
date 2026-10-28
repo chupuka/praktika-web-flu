@@ -150,7 +150,8 @@ class AuthNotifier extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> logout({SessionEndReason reason = SessionEndReason.manual}) async {
+  Future<void> logout(
+      {SessionEndReason reason = SessionEndReason.manual}) async {
     if (_loggingOut) return;
     _loggingOut = true;
     final refresh = _refreshToken;
@@ -223,7 +224,8 @@ class AuthNotifier extends ChangeNotifier {
     _absoluteTimer?.cancel();
     final started = _startedAt;
     if (started == null) return;
-    final remaining = AuthConfig.sessionLimit - DateTime.now().difference(started);
+    final remaining =
+        AuthConfig.sessionLimit - DateTime.now().difference(started);
     if (remaining <= Duration.zero) {
       logout(reason: SessionEndReason.absolute);
       return;

@@ -72,9 +72,8 @@ class _ProductFormScreenState
     controllerFor('color', entity.color);
     dropdownValues['categoryId'] = entity.categoryId;
     dropdownValues['manufacturerId'] = entity.manufacturerId;
-    dropdownValues['style'] = entity.style.isEmpty
-        ? null
-        : seedStyles.indexOf(entity.style) + 1;
+    dropdownValues['style'] =
+        entity.style.isEmpty ? null : seedStyles.indexOf(entity.style) + 1;
     multiValues['materialIds'] = [...entity.materialIds];
   }
 
@@ -169,32 +168,36 @@ class _ProductFormScreenState
         label: 'Ширина, см',
         kind: FieldKind.number,
         required: false,
-        validate: (v) =>
-            (v == null || v.trim().isEmpty) ? null : Validators.positiveNumber(v, 'Ширина'),
+        validate: (v) => (v == null || v.trim().isEmpty)
+            ? null
+            : Validators.positiveNumber(v, 'Ширина'),
       ),
       FieldSpec(
         key: 'depth',
         label: 'Глубина, см',
         kind: FieldKind.number,
         required: false,
-        validate: (v) =>
-            (v == null || v.trim().isEmpty) ? null : Validators.positiveNumber(v, 'Глубина'),
+        validate: (v) => (v == null || v.trim().isEmpty)
+            ? null
+            : Validators.positiveNumber(v, 'Глубина'),
       ),
       FieldSpec(
         key: 'height',
         label: 'Высота, см',
         kind: FieldKind.number,
         required: false,
-        validate: (v) =>
-            (v == null || v.trim().isEmpty) ? null : Validators.positiveNumber(v, 'Высота'),
+        validate: (v) => (v == null || v.trim().isEmpty)
+            ? null
+            : Validators.positiveNumber(v, 'Высота'),
       ),
       FieldSpec(
         key: 'weight',
         label: 'Вес, кг',
         kind: FieldKind.number,
         required: false,
-        validate: (v) =>
-            (v == null || v.trim().isEmpty) ? null : Validators.positiveNumber(v, 'Вес'),
+        validate: (v) => (v == null || v.trim().isEmpty)
+            ? null
+            : Validators.positiveNumber(v, 'Вес'),
       ),
       FieldSpec(
         key: 'color',

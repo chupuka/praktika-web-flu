@@ -21,9 +21,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   void initState() {
     super.initState();
     final repo = context.read<ProductRepository>();
-    _future = widget.id == null
-        ? Future.value(null)
-        : repo.findById(widget.id!);
+    _future =
+        widget.id == null ? Future.value(null) : repo.findById(widget.id!);
   }
 
   @override
@@ -51,8 +50,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               onRetry: () => context.go('/products'),
             );
           }
-          final materials =
-              refs.materialNames(product.materialIds).join(', ');
+          final materials = refs.materialNames(product.materialIds).join(', ');
           return Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 560),

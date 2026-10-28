@@ -135,9 +135,10 @@ class _LoginScreenState extends State<LoginScreen> {
                           border: OutlineInputBorder(),
                         ),
                         textInputAction: TextInputAction.next,
-                        validator: (value) => value == null || value.trim().isEmpty
-                            ? 'Укажите логин'
-                            : null,
+                        validator: (value) =>
+                            value == null || value.trim().isEmpty
+                                ? 'Укажите логин'
+                                : null,
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
@@ -166,7 +167,8 @@ class _LoginScreenState extends State<LoginScreen> {
                               ? const SizedBox(
                                   width: 20,
                                   height: 20,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                  child:
+                                      CircularProgressIndicator(strokeWidth: 2),
                                 )
                               : const Text('Войти'),
                         ),
@@ -199,8 +201,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         children: [
                           ActionChip(
                             label: const Text('Покупатель'),
-                            onPressed: () =>
-                                _fill('customer', 'customer123'),
+                            onPressed: () => _fill('customer', 'customer123'),
                           ),
                           ActionChip(
                             label: const Text('Менеджер'),
