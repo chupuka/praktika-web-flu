@@ -55,9 +55,11 @@ class _ProductListScreenState extends State<ProductListScreen> {
       if (_searchController.text != widget.initialQuery.search) {
         _searchController.text = widget.initialQuery.search;
       }
-      context
-          .read<ProductListNotifier>()
-          .applyQueryIfChanged(widget.initialQuery);
+      final next = widget.initialQuery;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        context.read<ProductListNotifier>().applyQueryIfChanged(next);
+      });
     }
   }
 

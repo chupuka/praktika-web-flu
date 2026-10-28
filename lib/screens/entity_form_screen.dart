@@ -141,7 +141,8 @@ abstract class EntityFormScreenState<T, W extends EntityFormScreen<T>>
       }
       _dirty = false;
       if (!mounted) return;
-      _invalidateList();
+      await _refreshList();
+      if (!mounted) return;
       context.go(returnLocation);
     } on ValidationException catch (e) {
       if (!mounted) return;
@@ -173,12 +174,16 @@ abstract class EntityFormScreenState<T, W extends EntityFormScreen<T>>
 
   String get returnLocation;
 
-  void _invalidateList() {
+  Future<void> _refreshList() async {
     final target = returnLocation;
-    if (target.startsWith('/categories')) {
-      context.read<CategoryListNotifier>().invalidate();
-    } else if (target.startsWith('/products')) {
-      context.read<ProductListNotifier>().invalidate();
+    try {
+      if (target.startsWith('/categories')) {
+        await context.read<CategoryListNotifier>().refresh();
+      } else if (target.startsWith('/products')) {
+        await context.read<ProductListNotifier>().refresh();
+      }
+    } catch (_) {
+      // Список перечитается при следующем открытии.
     }
   }
 
