@@ -2,6 +2,7 @@
 // Логика повторяет mock-server.js, меняется только транспорт.
 import { Buffer } from 'node:buffer';
 import crypto from 'node:crypto';
+import postgres from 'npm:postgres@3.4.5';
 
 const env = (name, fallback) => {
   try {
@@ -1002,6 +1003,52 @@ async function handle(req, res, url) {
 seed();
 
 
+const DB_URL = env('SUPABASE_DB_URL', '');
+const sql = DB_URL
+  ? postgres(DB_URL, { ssl: 'require', max: 1, idle_timeout: 15, connect_timeout: 10 })
+  : null;
+let schemaReady = false;
+
+async function ensureSchema() {
+  if (!sql || schemaReady) return;
+  await sql`create table if not exists app_state (
+    id int primary key,
+    data jsonb not null,
+    updated_at timestamptz not null default now()
+  )`;
+  schemaReady = true;
+}
+
+async function loadState(exec = sql, lock = false) {
+  if (!sql) return;
+  const rows = lock
+    ? await exec`select data from app_state where id = 1 for update`
+    : await exec`select data from app_state where id = 1`;
+  if (!rows.length) {
+    seed();
+    await saveState(exec);
+    return;
+  }
+  const data = rows[0].data;
+  data.refreshTokens = new Set(data.refreshTokens || []);
+  db = data;
+}
+
+async function saveState(exec = sql) {
+  if (!sql) return;
+  const payload = { ...db, refreshTokens: [...db.refreshTokens] };
+  await exec`insert into app_state (id, data, updated_at)
+             values (1, ${exec.json(payload)}, now())
+             on conflict (id) do update set data = excluded.data, updated_at = now()`;
+}
+
+let queue = Promise.resolve();
+const serialize = (task) => {
+  const run = queue.then(task, task);
+  queue = run.then(() => {}, () => {});
+  return run;
+};
+
 function nodeRequest(request, bodyText) {
   const url = new URL(request.url);
   const shim = {
@@ -1082,15 +1129,48 @@ Deno.serve(async (request) => {
       ? ''
       : await request.text();
 
-  const { shim, state } = nodeResponse();
-  const req = nodeRequest(request, bodyText);
+  const persist = request.method !== 'GET' && request.method !== 'HEAD';
 
-  try {
-    await handle(req, shim, url);
-  } catch (error) {
-    if (!state.sent) {
-      fail(shim, 500, 'Внутренняя ошибка сервера: ' + String(error && error.message));
+  const runOnce = async (exec, lock) => {
+    await loadState(exec, lock);
+    const { shim, state } = nodeResponse();
+    const req = nodeRequest(request, bodyText);
+    try {
+      await handle(req, shim, url);
+    } catch (error) {
+      if (!state.sent) {
+        fail(shim, 500, 'Внутренняя ошибка сервера: ' + String(error && error.message));
+      }
     }
+    if (persist && state.status < 400) {
+      await saveState(exec);
+    }
+    return state;
+  };
+
+  let state;
+  try {
+    state = await serialize(async () => {
+      if (sql) {
+        await ensureSchema();
+        return persist
+          ? await sql.begin((tx) => runOnce(tx, true))
+          : await runOnce(sql, false);
+      }
+      return runOnce(sql, false);
+    });
+  } catch (error) {
+    console.error('state failed: ' + String(error && error.message));
+    return new Response(
+      JSON.stringify({ message: 'Хранилище недоступно, повторите позже' }),
+      {
+        status: 503,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': ORIGIN
+        }
+      }
+    );
   }
 
   const headers = { ...state.headers, 'Access-Control-Allow-Origin': ORIGIN };

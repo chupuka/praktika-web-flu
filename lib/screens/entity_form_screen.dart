@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
 import '../core/api_exceptions.dart';
+import '../state/category_list_notifier.dart';
+import '../state/product_list_notifier.dart';
 import '../widgets/entity_form.dart';
 import '../widgets/state_views.dart';
 
@@ -138,6 +141,7 @@ abstract class EntityFormScreenState<T, W extends EntityFormScreen<T>>
       }
       _dirty = false;
       if (!mounted) return;
+      _invalidateList();
       context.go(returnLocation);
     } on ValidationException catch (e) {
       if (!mounted) return;
@@ -168,6 +172,15 @@ abstract class EntityFormScreenState<T, W extends EntityFormScreen<T>>
   }
 
   String get returnLocation;
+
+  void _invalidateList() {
+    final target = returnLocation;
+    if (target.startsWith('/categories')) {
+      context.read<CategoryListNotifier>().invalidate();
+    } else if (target.startsWith('/products')) {
+      context.read<ProductListNotifier>().invalidate();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

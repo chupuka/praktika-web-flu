@@ -22,6 +22,9 @@ class ProductListNotifier extends ChangeNotifier {
   final Set<int> _selected = {};
   Timer? _searchTimer;
   CancelToken? _cancelToken;
+  int _generation = 0;
+  Timer? _watchdog;
+  bool _stale = false;
 
   ProductQuery get query => _query;
   PageResult<Product> get result => _result;
@@ -31,20 +34,36 @@ class ProductListNotifier extends ChangeNotifier {
   bool get hasSelection => _selected.isNotEmpty;
 
   Future<void> load() async {
+    final generation = ++_generation;
     _cancelToken?.cancel('superseded');
     final token = CancelToken();
     _cancelToken = token;
     _status = LoadStatus.loading;
     _error = null;
+    _watchdog?.cancel();
+    final watchdog = Timer(const Duration(seconds: 30), () {
+      if (generation != _generation || _status != LoadStatus.loading) return;
+      _status = LoadStatus.error;
+      _error = 'Сервер не ответил вовремя. Нажмите «Повторить»';
+      notifyListeners();
+    });
+    _watchdog = watchdog;
     notifyListeners();
     try {
-      _result = await _repository.find(_query, cancelToken: token);
+      final result = await _repository.find(_query, cancelToken: token);
+      if (generation != _generation) return;
+      _result = result;
       _status = LoadStatus.success;
     } on ApiCancelled catch (_) {
-      return;
+      if (generation != _generation) return;
+      _status = LoadStatus.error;
+      _error = 'Запрос отменён. Нажмите «Повторить»';
     } catch (e) {
+      if (generation != _generation) return;
       _error = 'Не удалось загрузить список: $e';
       _status = LoadStatus.error;
+    } finally {
+      watchdog.cancel();
     }
     notifyListeners();
   }
@@ -55,8 +74,17 @@ class ProductListNotifier extends ChangeNotifier {
     await load();
   }
 
+  Future<void> refresh() async {
+    await load();
+  }
+
+  void invalidate() {
+    _stale = true;
+  }
+
   Future<void> applyQueryIfChanged(ProductQuery next) async {
-    if (next == _query && _status != LoadStatus.idle) return;
+    if (next == _query && _status != LoadStatus.idle && !_stale) return;
+    _stale = false;
     await applyQuery(next);
   }
 
@@ -106,6 +134,7 @@ class ProductListNotifier extends ChangeNotifier {
   @override
   void dispose() {
     _searchTimer?.cancel();
+    _watchdog?.cancel();
     _cancelToken?.cancel('disposed');
     super.dispose();
   }
