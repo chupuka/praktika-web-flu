@@ -162,7 +162,10 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
       case LoadStatus.error:
         return ErrorView(
           message: notifier.error ?? 'Ошибка загрузки',
-          onRetry: () => notifier.load(),
+          onRetry: () {
+            context.read<ReferenceRepository>().refresh();
+            notifier.load();
+          },
         );
       case LoadStatus.success:
         final result = notifier.result;

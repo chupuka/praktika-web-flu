@@ -11,7 +11,7 @@ sealed class ApiException implements Exception {
 
 class NetworkException extends ApiException {
   const NetworkException([
-    super.message = 'Сервер недоступен. Проверьте, запущен ли mock-сервер',
+    super.message = 'Сервер недоступен. Проверьте подключение к сети',
   ]);
 }
 

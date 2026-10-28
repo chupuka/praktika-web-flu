@@ -302,7 +302,10 @@ class _EntityListScreenState<T> extends State<EntityListScreen<T>> {
       case LoadStatus.error:
         return ErrorView(
           message: _error ?? 'Ошибка загрузки',
-          onRetry: _reload,
+          onRetry: () {
+            context.read<ReferenceRepository>().refresh();
+            _reload();
+          },
         );
       case LoadStatus.success:
         final result = _result;
