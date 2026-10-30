@@ -262,6 +262,15 @@ void main() {
     expect(request.query['id'], 'eq.5');
   });
 
+  test('жёсткое удаление не падает на пустом ответе сервера', () async {
+    adapter.enqueueJson(204, '');
+
+    await repo.hardDelete(6);
+
+    expect(adapter.requests.single.method, 'DELETE');
+    expect(adapter.requests.single.query['id'], 'eq.6');
+  });
+
   test('восстановление очищает дату удаления', () async {
     adapter.enqueueJson(200, [productRow()]);
 

@@ -156,9 +156,14 @@ Future<int> _deleteWhere(
   String table,
   Map<String, dynamic> query,
 ) async {
-  final response =
-      await client.deleteRaw<dynamic>(table, queryParameters: query);
-  return (response.data as List?)?.length ?? 0;
+  final response = await client.deleteRaw<dynamic>(
+    table,
+    queryParameters: query,
+    headers: _representation,
+  );
+  final data = response.data;
+  if (data is List) return data.length;
+  return 0;
 }
 
 Future<int> _patchWhere(

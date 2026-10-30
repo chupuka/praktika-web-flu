@@ -121,7 +121,7 @@ ApiException mapHttpError(int statusCode, dynamic data) {
     }
     if (code == '23503') {
       return const ConflictException(
-        'Запись используется в других данных и не может быть изменена',
+        'Запись используется в связанных данных',
       );
     }
     if (code == '23514' || code == '23502' || code == '22P02') {
